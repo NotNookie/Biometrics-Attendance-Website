@@ -1,286 +1,180 @@
 <?php
 declare(strict_types=1);
-
 session_start();
 
-if (!isset($_SESSION['admin_name']) || trim((string) $_SESSION['admin_name']) === '') {
-  header('Location: login.php');
-  exit;
-}
+/* ================= DB CONNECTION ================= */
+$pdo = new PDO("mysql:host=localhost;dbname=nookie;charset=utf8", "root", "");
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-$adminName = trim((string) $_SESSION['admin_name']);
-
-function e(string $value): string
-{
+/* ================= FUNCTIONS ================= */
+function e(string $value): string {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
 
-function isValidDate(string $value): bool
-{
+function isValidDate(string $value): bool {
     $date = DateTime::createFromFormat('Y-m-d', $value);
-    return $date instanceof DateTime && $date->format('Y-m-d') === $value;
+    return $date && $date->format('Y-m-d') === $value;
 }
 
-function toMinutes(?string $time): ?int
-{
-    if ($time === null || $time === '') {
-        return null;
-    }
+function toMinutes(?string $time): ?int {
+    if (!$time) return null;
 
-    $clock = DateTime::createFromFormat('H:i', $time);
-    if (!$clock instanceof DateTime) {
-        return null;
-    }
-
-    return ((int) $clock->format('H') * 60) + (int) $clock->format('i');
-}
-
-function durationMinutes(?string $start, ?string $end): ?int
-{
-    $startMinutes = toMinutes($start);
-    $endMinutes = toMinutes($end);
-
-    if ($startMinutes === null || $endMinutes === null) {
-        return null;
-    }
-
-    if ($endMinutes < $startMinutes) {
-        $endMinutes += 24 * 60;
-    }
-
-    return $endMinutes - $startMinutes;
-}
-
-function formatMinutes(int $minutes): string
-{
-    $hours = intdiv($minutes, 60);
-    $remainingMinutes = $minutes % 60;
-    return $hours . 'h ' . str_pad((string) $remainingMinutes, 2, '0', STR_PAD_LEFT) . 'm';
-}
-
-function formatDailyTotal(?int $minutes): string
-{
-    if ($minutes === null) {
-        return 'Incomplete';
-    }
-
-    return formatMinutes($minutes);
-}
-
-function formatClock(?string $time): string
-{
-    if ($time === null || $time === '') {
-        return '-';
-    }
-
-    $clock = DateTime::createFromFormat('H:i', $time);
-    if (!$clock instanceof DateTime) {
-        return '-';
-    }
-
-    return $clock->format('h:i A');
-}
-
-$employees = [
-    'all' => 'All Employees',
-    'john_doe' => 'John Doe',
-    'ilele_ray' => 'Ilele Ray',
-];
-
-$records = [
-    [
-        'employee_key' => 'john_doe',
-        'employee_name' => 'John Doe',
-        'date' => '2026-04-01',
-        'schedule_start' => '08:00',
-        'schedule_end' => '17:00',
-        'pay_code' => 'Regular',
-        'amount' => '1.00',
-        'time_in' => '08:03',
-        'time_out' => '17:05',
-        'absence' => 'None',
-        'transfer' => 'HQ',
-    ],
-    [
-        'employee_key' => 'john_doe',
-        'employee_name' => 'John Doe',
-        'date' => '2026-04-02',
-        'schedule_start' => '08:00',
-        'schedule_end' => '17:00',
-        'pay_code' => 'Regular',
-        'amount' => '1.00',
-        'time_in' => '08:10',
-        'time_out' => '',
-        'absence' => 'None',
-        'transfer' => 'HQ',
-    ],
-    [
-        'employee_key' => 'ilele_ray',
-        'employee_name' => 'Ilele Ray',
-        'date' => '2026-04-01',
-        'schedule_start' => '07:00',
-        'schedule_end' => '16:00',
-        'pay_code' => 'Regular',
-        'amount' => '1.00',
-        'time_in' => '07:01',
-        'time_out' => '16:02',
-        'absence' => 'None',
-        'transfer' => 'Production',
-    ],
-    [
-        'employee_key' => 'ilele_ray',
-        'employee_name' => 'Ilele Ray',
-        'date' => '2026-04-03',
-        'schedule_start' => '07:00',
-        'schedule_end' => '16:00',
-        'pay_code' => 'Regular',
-        'amount' => '1.00',
-        'time_in' => '07:12',
-        'time_out' => '16:05',
-        'absence' => 'Late',
-        'transfer' => 'Production',
-    ],
-];
-
-$defaultFrom = '2026-04-01';
-$defaultTo = '2026-04-30';
-
-$selectedEmployee = $_GET['employee'] ?? 'all';
-if (!array_key_exists($selectedEmployee, $employees)) {
-    $selectedEmployee = 'all';
-}
-
-$fromDate = $_GET['from'] ?? $defaultFrom;
-if (!isValidDate($fromDate)) {
-    $fromDate = $defaultFrom;
-}
-
-$toDate = $_GET['to'] ?? $defaultTo;
-if (!isValidDate($toDate)) {
-    $toDate = $defaultTo;
-}
-
-$filteredRecords = array_values(array_filter($records, function (array $record) use ($selectedEmployee, $fromDate, $toDate): bool {
-    if ($selectedEmployee !== 'all' && $record['employee_key'] !== $selectedEmployee) {
-        return false;
-    }
-
-    if ($record['date'] < $fromDate || $record['date'] > $toDate) {
-        return false;
-    }
-
-    return true;
-}));
-
-usort($filteredRecords, static function (array $first, array $second): int {
-    if ($first['employee_name'] === $second['employee_name']) {
-        return strcmp($first['date'], $second['date']);
-    }
-    return strcmp($first['employee_name'], $second['employee_name']);
-});
-
-$runningTotals = [];
-$summaryTotals = [];
-$processedRows = [];
-
-foreach ($filteredRecords as $record) {
-    $employeeKey = $record['employee_key'];
-    $shiftMinutes = durationMinutes($record['schedule_start'], $record['schedule_end']);
-    $dailyMinutes = durationMinutes($record['time_in'], $record['time_out']);
-
-    if (!isset($runningTotals[$employeeKey])) {
-        $runningTotals[$employeeKey] = 0;
-    }
-
-    if (!isset($summaryTotals[$employeeKey])) {
-        $summaryTotals[$employeeKey] = [
-            'name' => $record['employee_name'],
-            'minutes' => 0,
-        ];
-    }
-
-    if ($dailyMinutes !== null) {
-        $runningTotals[$employeeKey] += $dailyMinutes;
-        $summaryTotals[$employeeKey]['minutes'] += $dailyMinutes;
-    }
-
-    $processedRows[] = [
-        'employee_name' => $record['employee_name'],
-        'date' => $record['date'],
-        'schedule' => formatClock($record['schedule_start']) . ' - ' . formatClock($record['schedule_end']),
-        'pay_code' => $record['pay_code'],
-        'amount' => $record['amount'],
-        'time_in' => formatClock($record['time_in']),
-        'time_out' => $record['time_out'] === '' ? 'Missing' : formatClock($record['time_out']),
-        'shift' => $shiftMinutes === null ? '-' : formatMinutes($shiftMinutes),
-        'daily_total' => formatDailyTotal($dailyMinutes),
-        'period_total' => formatMinutes($runningTotals[$employeeKey]),
-        'absence' => $record['absence'],
-        'transfer' => $record['transfer'],
-    ];
-}
-
-$downloadType = $_GET['download'] ?? '';
-if (in_array($downloadType, ['csv', 'xls'], true)) {
-    $delimiter = $downloadType === 'xls' ? "\t" : ',';
-    $extension = $downloadType === 'xls' ? 'xls' : 'csv';
-    $contentType = $downloadType === 'xls' ? 'application/vnd.ms-excel' : 'text/csv';
-
-    header('Content-Type: ' . $contentType . '; charset=utf-8');
-    header('Content-Disposition: attachment; filename="dtr_export_' . date('Ymd_His') . '.' . $extension . '"');
-
-    $output = fopen('php://output', 'wb');
-    if ($output === false) {
-        exit;
-    }
-
-    fputcsv($output, ['Date', 'Employee', 'Schedule', 'Pay Code', 'Amount', 'Time In', 'Time Out', 'Shift', 'Daily Total', 'Period Total', 'Absence', 'Transfer'], $delimiter);
-
-    foreach ($processedRows as $row) {
-        fputcsv($output, [
-            $row['date'],
-            $row['employee_name'],
-            $row['schedule'],
-            $row['pay_code'],
-            $row['amount'],
-            $row['time_in'],
-            $row['time_out'],
-            $row['shift'],
-            $row['daily_total'],
-            $row['period_total'],
-            $row['absence'],
-            $row['transfer'],
-        ], $delimiter);
-    }
-
-    if ($summaryTotals !== []) {
-        fputcsv($output, [], $delimiter);
-        fputcsv($output, ['Summary: Total Hours per Employee'], $delimiter);
-        fputcsv($output, ['Employee', 'Total Hours'], $delimiter);
-
-        foreach ($summaryTotals as $summary) {
-            fputcsv($output, [$summary['name'], formatMinutes($summary['minutes'])], $delimiter);
+    $formats = ['Y-m-d H:i:s', 'H:i:s', 'H:i'];
+    foreach ($formats as $format) {
+        $clock = DateTime::createFromFormat($format, $time);
+        if ($clock) {
+            return ((int)$clock->format('H') * 60) + (int)$clock->format('i');
         }
     }
 
-    fclose($output);
+    return null;
+}
+
+function durationMinutes(?string $start, ?string $end): ?int {
+    $start = toMinutes($start);
+    $end = toMinutes($end);
+    if ($start === null || $end === null) return null;
+    if ($end < $start) $end += 1440;
+    return $end - $start;
+}
+
+function formatMinutes(int $m): string {
+    return intdiv($m, 60) . ':' . str_pad((string)($m % 60), 2, '0', STR_PAD_LEFT);
+}
+
+function formatClock(?string $time): string {
+    if (!$time) return '-';
+
+    $formats = ['Y-m-d H:i:s', 'H:i:s', 'H:i'];
+    foreach ($formats as $format) {
+        $clock = DateTime::createFromFormat($format, $time);
+        if ($clock) {
+            return $clock->format('h:i A');
+        }
+    }
+
+    return '-';
+}
+
+/* ================= FILTERS ================= */
+$defaultFrom = date('Y-m-01');
+$defaultTo = date('Y-m-t');
+
+$selectedEmployee = $_GET['employee'] ?? 'all';
+$fromDate = $_GET['from'] ?? $defaultFrom;
+$toDate = $_GET['to'] ?? $defaultTo;
+
+if (!isValidDate($fromDate)) $fromDate = $defaultFrom;
+if (!isValidDate($toDate)) $toDate = $defaultTo;
+
+/* ================= FETCH EMPLOYEES ================= */
+$employees = ['all' => 'All Employees'];
+
+$stmt = $pdo->query("SELECT employee_key, name FROM employees ORDER BY name ASC");
+while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    $employees[$row['employee_key']] = $row['name'];
+}
+
+/* ================= FETCH ATTENDANCE ================= */
+$sql = "
+SELECT a.*, e.name AS employee_name
+FROM attendance a
+JOIN employees e ON a.employee_key = e.employee_key
+WHERE a.date BETWEEN :from AND :to
+";
+
+$params = [
+    ':from' => $fromDate,
+    ':to' => $toDate
+];
+
+if ($selectedEmployee !== 'all') {
+    $sql .= " AND a.employee_key = :emp";
+    $params[':emp'] = $selectedEmployee;
+}
+
+$sql .= " ORDER BY e.name, a.date";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+/* ================= PROCESS DATA ================= */
+$runningTotals = [];
+$summaryTotals = [];
+$rows = [];
+
+foreach ($records as $r) {
+    $key = $r['employee_key'];
+
+    $shift = durationMinutes($r['schedule_start'], $r['schedule_end']);
+    $daily = durationMinutes($r['time_in'], $r['time_out']);
+
+    if (!isset($runningTotals[$key])) $runningTotals[$key] = 0;
+    if (!isset($summaryTotals[$key])) {
+        $summaryTotals[$key] = ['name' => $r['employee_name'], 'minutes' => 0];
+    }
+
+    if ($daily !== null) {
+        $runningTotals[$key] += $daily;
+        $summaryTotals[$key]['minutes'] += $daily;
+    }
+
+    $absence = $r['absence'] ?? 'None';
+
+    $rows[] = [
+        'date' => $r['date'],
+        'employee' => $r['employee_name'],
+        'schedule' => formatClock($r['schedule_start']) . ' - ' . formatClock($r['schedule_end']),
+        'pay' => $r['pay_code'] ?? 'Regular',
+        'amount' => $r['amount'] ?? '1.00',
+        'in' => formatClock($r['time_in']),
+        'out' => $r['time_out'] ? formatClock($r['time_out']) : 'Missing',
+        'shift' => $shift !== null ? formatMinutes($shift) : '-',
+        'daily' => $daily !== null ? formatMinutes($daily) : 'Incomplete',
+        'period' => formatMinutes($runningTotals[$key]),
+        'absence' => $absence,
+        'transfer' => $r['transfer'] ?? 'HQ'
+    ];
+}
+
+/* ================= EXPORT ================= */
+if (isset($_GET['download'])) {
+    $type = $_GET['download'];
+    $delimiter = $type === 'xls' ? "\t" : ',';
+
+    header("Content-Type: text/csv");
+    header("Content-Disposition: attachment; filename=dtr_export.csv");
+
+    $out = fopen("php://output", "w");
+
+    fputcsv($out, ['Date','Employee','Schedule','Pay Code','Amount','Time In','Time Out','Shift','Daily Total','Period Total','Absence','Transfer'], $delimiter);
+
+    foreach ($rows as $row) {
+        fputcsv($out, [
+            $row['date'],
+            $row['employee'],
+            $row['schedule'],
+            $row['pay'],
+            $row['amount'],
+            $row['in'],
+            $row['out'],
+            $row['shift'],
+            $row['daily'],
+            $row['period'],
+            $row['absence'],
+            $row['transfer']
+        ], $delimiter);
+    }
+
+    fclose($out);
     exit;
 }
 
-$csvQuery = http_build_query([
-    'employee' => $selectedEmployee,
-    'from' => $fromDate,
-    'to' => $toDate,
-    'download' => 'csv',
-]);
-
-$excelQuery = http_build_query([
-    'employee' => $selectedEmployee,
-    'from' => $fromDate,
-    'to' => $toDate,
-    'download' => 'xls',
-]);
+/* ================= ADMIN NAME ================= */
+$adminName = $_SESSION['admin_name'] ?? 'Admin';
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -315,14 +209,19 @@ $excelQuery = http_build_query([
       </header>
 
       <section class="content">
+
+        <!-- FILTER CARD -->
         <article class="card">
           <h2 class="card-title">Filter Time Card</h2>
-          <form class="filter-bar" method="get" action="dtr.php">
+
+          <form method="GET" class="filter-bar">
             <div>
               <label for="employee">Employee</label>
               <select id="employee" name="employee">
-                <?php foreach ($employees as $key => $name): ?>
-                  <option value="<?= e($key) ?>" <?= $selectedEmployee === $key ? 'selected' : '' ?>><?= e($name) ?></option>
+                <?php foreach ($employees as $k => $v): ?>
+                  <option value="<?= e((string)$k) ?>" <?= $k == $selectedEmployee ? 'selected' : '' ?>>
+                    <?= e($v) ?>
+                  </option>
                 <?php endforeach; ?>
               </select>
             </div>
@@ -341,23 +240,26 @@ $excelQuery = http_build_query([
               <label>&nbsp;</label>
               <button class="btn-primary" type="submit">View Reports</button>
             </div>
+
+            <div>
+              <label>&nbsp;</label>
+              <a class="btn-primary" style="text-decoration:none;display:inline-block;text-align:center;"
+                 href="?employee=<?= urlencode((string)$selectedEmployee) ?>&from=<?= urlencode($fromDate) ?>&to=<?= urlencode($toDate) ?>&download=csv">
+                 Download CSV
+              </a>
+            </div>
           </form>
         </article>
 
+        <!-- DTR TABLE -->
         <article class="card">
-          <div class="card-header-row">
-            <h2 class="card-title">DTR / Time Card Table</h2>
-            <div class="download-actions">
-              <a class="btn-secondary" href="dtr.php?<?= e($csvQuery) ?>">Download CSV</a>
-              <a class="btn-secondary" href="dtr.php?<?= e($excelQuery) ?>">Download Excel</a>
-            </div>
-          </div>
-
+          <h2 class="card-title">DTR / Time Card Table</h2>
           <div class="table-wrap">
             <table class="timecard">
               <thead>
                 <tr>
                   <th>Date</th>
+                  <th>Employee</th>
                   <th>Schedule</th>
                   <th>Pay Code</th>
                   <th>Amount</th>
@@ -371,36 +273,45 @@ $excelQuery = http_build_query([
                 </tr>
               </thead>
               <tbody>
-                <?php if ($processedRows === []): ?>
-                  <tr>
-                    <td colspan="11">No records found for the selected filters.</td>
-                  </tr>
-                <?php else: ?>
-                  <?php foreach ($processedRows as $row): ?>
+                <?php if (count($rows) > 0): ?>
+                  <?php foreach ($rows as $r): ?>
                     <tr>
-                      <td><?= e($row['date']) ?></td>
-                      <td><?= e($row['schedule']) ?></td>
-                      <td><?= e($row['pay_code']) ?></td>
-                      <td><?= e($row['amount']) ?></td>
-                      <td><?= e($row['time_in']) ?></td>
-                      <td><?= e($row['time_out']) ?></td>
-                      <td><?= e($row['shift']) ?></td>
-                      <td><?= e($row['daily_total']) ?></td>
-                      <td><?= e($row['period_total']) ?></td>
+                      <td><?= e($r['date']) ?></td>
+                      <td><?= e($r['employee']) ?></td>
+                      <td><?= e($r['schedule']) ?></td>
+                      <td><?= e($r['pay']) ?></td>
+                      <td><?= e((string)$r['amount']) ?></td>
+                      <td><?= e($r['in']) ?></td>
+                      <td><?= e($r['out']) ?></td>
+                      <td><?= e($r['shift']) ?></td>
+                      <td><?= e($r['daily']) ?></td>
+                      <td><?= e($r['period']) ?></td>
                       <td>
-                        <span class="badge <?= $row['absence'] === 'None' ? 'success' : 'warning' ?>"><?= e($row['absence']) ?></span>
+                        <?php
+                          $absenceClass = 'success';
+                          if (strtolower($r['absence']) === 'late') $absenceClass = 'warning';
+                          elseif (strtolower($r['absence']) === 'absent') $absenceClass = 'danger';
+                        ?>
+                        <span class="badge <?= $absenceClass ?>"><?= e($r['absence']) ?></span>
                       </td>
-                      <td><?= e($row['transfer']) ?></td>
+                      <td><?= e($r['transfer']) ?></td>
                     </tr>
                   <?php endforeach; ?>
+                <?php else: ?>
+                  <tr>
+                    <td colspan="12">No attendance records found.</td>
+                  </tr>
                 <?php endif; ?>
               </tbody>
             </table>
           </div>
+        </article>
 
-          <div class="summary-box">
-            <h3 class="summary-title">Total Hours per Employee</h3>
-            <table class="summary-table">
+        <!-- SUMMARY -->
+        <article class="card">
+          <h2 class="card-title">Summary Total Hours</h2>
+          <div class="table-wrap">
+            <table class="timecard">
               <thead>
                 <tr>
                   <th>Employee</th>
@@ -408,22 +319,23 @@ $excelQuery = http_build_query([
                 </tr>
               </thead>
               <tbody>
-                <?php if ($summaryTotals === []): ?>
-                  <tr>
-                    <td colspan="2">No summary available.</td>
-                  </tr>
-                <?php else: ?>
-                  <?php foreach ($summaryTotals as $summary): ?>
+                <?php if (count($summaryTotals) > 0): ?>
+                  <?php foreach ($summaryTotals as $s): ?>
                     <tr>
-                      <td><?= e($summary['name']) ?></td>
-                      <td><?= e(formatMinutes($summary['minutes'])) ?></td>
+                      <td><?= e($s['name']) ?></td>
+                      <td><?= e(formatMinutes($s['minutes'])) ?></td>
                     </tr>
                   <?php endforeach; ?>
+                <?php else: ?>
+                  <tr>
+                    <td colspan="2">No summary data available.</td>
+                  </tr>
                 <?php endif; ?>
               </tbody>
             </table>
           </div>
         </article>
+
       </section>
     </main>
   </div>
