@@ -239,6 +239,227 @@ button:focus {
   gap: 8px;
 }
 
+.card-grid-2 {
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+}
+
+.card-grid-3 {
+  grid-template-columns: repeat(3, minmax(170px, 1fr));
+}
+
+.table-toolbar {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 180px 110px;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.tool-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.tool-actions .btn-mini {
+  display: inline-block;
+  text-align: center;
+}
+
+.btn-mini {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.btn-mini.edit {
+  background: #ecf5ff;
+  border-color: #b8d6f3;
+  color: #245781;
+}
+
+.btn-mini.delete {
+  background: #fff2f2;
+  border-color: #efc5c5;
+  color: #a23f3f;
+}
+
+.table-footnote {
+  margin: 10px 2px 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.employee-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+}
+
+.field-span-2 {
+  grid-column: 1 / -1;
+}
+
+.form-intro {
+  margin-bottom: 14px;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.form-actions .btn-primary,
+.form-actions .btn-secondary {
+  width: auto;
+}
+
+.btn-danger {
+  width: auto;
+  border: 1px solid #d97b7b;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #e66f6f 0%, #cc4b4b 100%);
+  color: #ffffff;
+  font-weight: 700;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(180deg, #d76262 0%, #b94141 100%);
+}
+
+.delete-card {
+  max-width: 720px;
+}
+
+.delete-kicker {
+  display: inline-block;
+  margin: 0 0 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #efc5c5;
+  color: #9f3a3a;
+  background: #fff2f2;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.delete-employee-meta {
+  margin: 14px 0 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.meta-item {
+  border: 1px solid var(--line);
+  background: #f9fcff;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.meta-label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-bottom: 4px;
+}
+
+.modal-open {
+  overflow: hidden;
+}
+
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 28, 44, 0.58);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  z-index: 999;
+}
+
+.dialog-card {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 24px 50px rgba(16, 36, 57, 0.35);
+}
+
+.dialog-card-sm {
+  width: min(560px, 100%);
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.dialog-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #7f8ea1;
+  font-weight: 700;
+}
+
+.dialog-close:hover {
+  background: #f2f6fb;
+}
+
+.dialog-form-grid {
+  padding: 14px 16px 6px;
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 10px 16px;
+  align-items: center;
+}
+
+.dialog-form-grid label {
+  font-weight: 700;
+  color: #3d4f63;
+}
+
+.dialog-card .helper-text {
+  padding: 14px 16px 0;
+}
+
+.dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding: 14px 16px;
+}
+
+.dialog-footer .btn-primary,
+.dialog-footer .btn-secondary,
+.dialog-footer .btn-danger {
+  width: auto;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -518,8 +739,33 @@ button:focus {
     grid-template-columns: 1fr;
   }
 
+  .card-grid-2,
+  .card-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
   .filter-bar {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .table-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .employee-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-form-grid {
+    grid-template-columns: 130px 1fr;
+  }
+
+  .delete-employee-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .field-span-2 {
+    grid-column: auto;
   }
 
   .card-header-row {
@@ -539,6 +785,23 @@ button:focus {
 
   .filter-bar {
     grid-template-columns: 1fr;
+  }
+
+  .table-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .dialog-overlay {
+    padding: 12px;
+  }
+
+  .dialog-form-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .dialog-title {
+    font-size: 1.2rem;
   }
 
   .scan-card {
