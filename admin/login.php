@@ -1,3 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+session_start();
+
+if (isset($_SESSION['admin_name']) && $_SESSION['admin_name'] !== '') {
+  header('Location: dashboard.php');
+  exit;
+}
+
+$error = '';
+$loggedOut = ($_GET['logged_out'] ?? '') === '1';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $username = trim((string) ($_POST['username'] ?? ''));
+  $password = trim((string) ($_POST['password'] ?? ''));
+
+  if ($username === '' || $password === '') {
+    $error = 'Please enter your username and password.';
+  } else {
+    $_SESSION['admin_name'] = $username;
+    header('Location: dashboard.php');
+    exit;
+  }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -15,7 +42,15 @@
       <p class="login-kicker">Attendance System</p>
       <h1 class="login-heading">Login</h1>
 
-      <form action="dashboard.php" method="post">
+      <?php if ($loggedOut): ?>
+        <p class="login-alert success">You have been logged out successfully.</p>
+      <?php endif; ?>
+
+      <?php if ($error !== ''): ?>
+        <p class="login-alert error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
+      <?php endif; ?>
+
+      <form action="login.php" method="post">
         <div class="form-group">
           <input class="input" type="text" id="username" name="username" placeholder="Enter username" required>
         </div>

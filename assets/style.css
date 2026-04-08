@@ -709,6 +709,27 @@ button:focus {
   color: var(--muted);
 }
 
+.login-alert {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+}
+
+.login-alert.success {
+  background: #eff9f3;
+  border-color: #c6e4d3;
+  color: #2d7f54;
+}
+
+.login-alert.error {
+  background: #fff2f2;
+  border-color: #efc5c5;
+  color: #9f3a3a;
+}
+
 .form-group {
   margin-bottom: 14px;
 }

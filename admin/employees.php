@@ -2,6 +2,15 @@
 
 declare(strict_types=1);
 
+session_start();
+
+if (!isset($_SESSION['admin_name']) || trim((string) $_SESSION['admin_name']) === '') {
+  header('Location: login.php');
+  exit;
+}
+
+$adminName = trim((string) $_SESSION['admin_name']);
+
 function e(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
@@ -52,7 +61,7 @@ if ($employeeId === '') {
         <h1 class="page-title">Employee List</h1>
         <div class="admin-pill">
           <span class="dot" aria-hidden="true"></span>
-          Admin: Cletus Igbe
+          Admin: <?= e($adminName) ?>
         </div>
       </header>
 
