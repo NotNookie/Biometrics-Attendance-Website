@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>Biometric Time In/Out</title>
 
-    <!-- Google Font -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
@@ -47,6 +46,7 @@
             font-size: 70px;
             margin-bottom: 15px;
             animation: pulse 2s infinite;
+            display: inline-block;
         }
 
         h2 {
@@ -171,6 +171,10 @@
             opacity: 0.9;
         }
 
+        .wave {
+            animation: waveHand 0.6s ease;
+        }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -186,6 +190,15 @@
             0% { transform: scale(1); opacity: 1; }
             50% { transform: scale(1.08); opacity: 0.85; }
             100% { transform: scale(1); opacity: 1; }
+        }
+
+        @keyframes waveHand {
+            0% { transform: rotate(0deg); }
+            20% { transform: rotate(15deg); }
+            40% { transform: rotate(-10deg); }
+            60% { transform: rotate(15deg); }
+            80% { transform: rotate(-5deg); }
+            100% { transform: rotate(0deg); }
         }
 
         @media (max-width: 500px) {
@@ -212,14 +225,14 @@
 
 <div class="container">
     <div class="card">
-        <div class="icon">🖐️</div>
+        <div class="icon" id="handIcon">🖐️</div>
         <h2>Biometric Attendance</h2>
         <p class="subtitle">Scan fingerprint to record attendance</p>
 
         <div class="datetime" id="datetime"></div>
 
         <div class="input-group">
-            <input type="text" id="fingerprint" placeholder="Enter or Scan Fingerprint ID" />
+            <input type="text" id="fingerprint" placeholder="Enter Employee Key" />
         </div>
 
         <div class="buttons">
@@ -238,7 +251,6 @@
 </div>
 
 <script>
-    // Live Date and Time
     function updateDateTime() {
         const now = new Date();
         const options = {
@@ -259,25 +271,21 @@
     setInterval(updateDateTime, 1000);
     updateDateTime();
 
-    // Hand wave animation
     function waveHand() {
         const hand = document.getElementById("handIcon");
+        if (!hand) return;
+
         hand.classList.remove("wave");
-
-        // Restart animation
         void hand.offsetWidth;
-
         hand.classList.add("wave");
     }
 
     const fingerprintInput = document.getElementById("fingerprint");
 
-    // Wave on user interaction
     fingerprintInput.addEventListener("focus", waveHand);
     fingerprintInput.addEventListener("click", waveHand);
     fingerprintInput.addEventListener("input", waveHand);
 
-    // Enter Key Support
     fingerprintInput.addEventListener("keypress", function(e) {
         if (e.key === "Enter") {
             submitAttendance('timein.php', 'Time In');
@@ -301,7 +309,7 @@
         let fp = document.getElementById("fingerprint").value.trim();
 
         if (fp === "") {
-            showResult("⚠️ Please enter or scan a Fingerprint ID first.", "error");
+            showResult("⚠️ Please enter or scan an Employee Key first.", "error");
             return;
         }
 
@@ -317,10 +325,10 @@
             setLoading(false);
 
             const lower = data.toLowerCase();
-            if (lower.includes("error") || lower.includes("not found") || lower.includes("failed") || lower.includes("invalid")) {
-                showResult("❌ " + data, "error");
+            if (lower.includes("error") || lower.includes("not found") || lower.includes("failed") || lower.includes("invalid") || lower.includes("no time in")) {
+                showResult(data, "error");
             } else {
-                showResult("✅ " + data, "success");
+                showResult(data, "success");
                 document.getElementById("fingerprint").value = "";
                 document.getElementById("fingerprint").focus();
             }
@@ -328,10 +336,10 @@
         .catch(err => {
             setLoading(false);
             showResult("❌ Connection failed. Please check your server.", "error");
+            console.error(err);
         });
     }
 
-    // Auto focus input
     window.onload = () => {
         document.getElementById("fingerprint").focus();
     };
