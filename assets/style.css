@@ -210,6 +210,35 @@ button:focus {
   background: linear-gradient(180deg, #3487c8 0%, var(--primary-dark) 100%);
 }
 
+.btn-secondary {
+  display: inline-block;
+  border: 1px solid #b6cfE6;
+  background: #f4f9ff;
+  color: #245781;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 0.88rem;
+}
+
+.btn-secondary:hover {
+  background: #e9f3fe;
+}
+
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--line);
@@ -243,6 +272,41 @@ button:focus {
 
 .timecard tbody tr:hover {
   background: #edf5fd;
+}
+
+.summary-box {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fcfeff;
+  overflow: hidden;
+}
+
+.summary-title {
+  margin: 0;
+  padding: 11px 12px;
+  background: #f3f8fe;
+  border-bottom: 1px solid var(--line);
+  color: #2a4a69;
+  font-size: 0.96rem;
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.summary-table th,
+.summary-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+.summary-table thead th {
+  font-weight: 800;
+  color: #395775;
 }
 
 .badge {
@@ -332,6 +396,101 @@ button:focus {
   font-weight: 700;
 }
 
+.login-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-shell::before,
+.login-shell::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  z-index: 0;
+}
+
+.login-shell::before {
+  width: 340px;
+  height: 340px;
+  background: radial-gradient(circle, rgba(47, 127, 190, 0.2) 0%, rgba(47, 127, 190, 0) 70%);
+  top: -80px;
+  right: -90px;
+}
+
+.login-shell::after {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(23, 58, 90, 0.16) 0%, rgba(23, 58, 90, 0) 70%);
+  bottom: -95px;
+  left: -80px;
+}
+
+.login-form-card {
+  width: min(440px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: 0 22px 45px rgba(30, 62, 98, 0.14);
+  padding: 30px 28px;
+  position: relative;
+  z-index: 1;
+}
+
+.login-kicker {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #c8dcec;
+  color: #2a5a84;
+  background: #f1f8ff;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+}
+
+.login-heading {
+  margin: 0 0 6px;
+  font-size: 2rem;
+  line-height: 1.1;
+}
+
+.login-form-card .subtext {
+  margin: 0 0 20px;
+  color: var(--muted);
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+.login-form-card .btn-primary {
+  margin-top: 4px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  font-size: 0.98rem;
+}
+
+.login-footer {
+  margin-top: 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -362,6 +521,11 @@ button:focus {
   .filter-bar {
     grid-template-columns: 1fr 1fr;
   }
+
+  .card-header-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 @media (max-width: 640px) {
@@ -384,5 +548,18 @@ button:focus {
   .scan-button {
     width: 180px;
     height: 180px;
+  }
+
+  .login-shell {
+    padding: 16px;
+  }
+
+  .login-form-card {
+    padding: 22px 16px;
+    border-radius: 16px;
+  }
+
+  .login-heading {
+    font-size: 1.7rem;
   }
 }
