@@ -4,10 +4,7 @@ ini_set('display_errors', 1);
 
 date_default_timezone_set("Asia/Manila");
 
-$conn = new mysqli("localhost", "root", "", "nookie");
-if ($conn->connect_error) {
-    die("Database Connection Failed: " . $conn->connect_error);
-}
+require_once __DIR__ . '/db.php';
 
 $fingerprint = trim($_POST['fingerprint'] ?? '');
 

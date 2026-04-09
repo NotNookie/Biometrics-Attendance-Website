@@ -3,8 +3,8 @@ declare(strict_types=1);
 session_start();
 
 /* ================= DB CONNECTION ================= */
-$pdo = new PDO("mysql:host=localhost;dbname=nookie;charset=utf8", "root", "");
-$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+require_once __DIR__ . '/../config/database.php';
+$pdo = get_pdo_connection();
 
 /* ================= FUNCTIONS ================= */
 function e(string $value): string {

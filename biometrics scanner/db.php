@@ -1,12 +1,5 @@
 <?php
-$host = "localhost";
-$user = "root";
-$pass = "";
-$db   = "nookie";
+require_once __DIR__ . '/../config/database.php';
 
-$conn = new mysqli($host, $user, $pass, $db);
-
-if ($conn->connect_error) {
-    die("Database Connection Failed: " . $conn->connect_error);
-}
+$conn = get_mysqli_connection();
 ?>
