@@ -38,31 +38,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 <body>
   <main class="login-shell">
-    <section class="login-form-card" aria-label="Login form">
-      <p class="login-kicker">Attendance System</p>
-      <h1 class="login-heading">Login</h1>
-
-      <?php if ($loggedOut): ?>
-        <p class="login-alert success">You have been logged out successfully.</p>
-      <?php endif; ?>
-
-      <?php if ($error !== ''): ?>
-        <p class="login-alert error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
-      <?php endif; ?>
-
-      <form action="login.php" method="post">
-        <div class="form-group">
-          <input class="input" type="text" id="username" name="username" placeholder="Enter username" required>
+    <section class="login-stage" aria-label="Admin login">
+      <aside class="login-aside">
+        <div class="login-aside-brand">
+          <strong>Attendance</strong>
+          <span>System</span>
         </div>
+        <h2 class="login-aside-title">Admin Access Portal</h2>
+        <p class="login-aside-text">Manage workforce activity, attendance logs, and DTR reports from one secure dashboard.</p>
 
-        <div class="form-group">
-          <input class="input" type="password" id="password" name="password" placeholder="Enter password" required>
-        </div>
+        <ul class="login-feature-list" aria-label="System highlights">
+          <li>Real-time attendance visibility</li>
+          <li>Employee and schedule management</li>
+          <li>Daily and period report tracking</li>
+        </ul>
+      </aside>
 
-        <button class="btn-primary" type="submit">Sign In</button>
-      </form>
+      <section class="login-form-card" aria-label="Login form">
+        <p class="login-kicker">Admin Sign In</p>
+        <h1 class="login-heading">Welcome Back</h1>
+        <p class="login-subtext">Enter your credentials to access the Attendance System.</p>
 
-      <p class="login-footer">Biometric Fingerprint Employee Attendance System</p>
+        <?php if ($loggedOut): ?>
+          <p class="login-alert success">You have been logged out successfully.</p>
+        <?php endif; ?>
+
+        <?php if ($error !== ''): ?>
+          <p class="login-alert error"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
+        <?php endif; ?>
+
+        <form action="login.php" method="post">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input class="input" type="text" id="username" name="username" placeholder="Enter username" autocomplete="username" required>
+          </div>
+
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input class="input" type="password" id="password" name="password" placeholder="Enter password" autocomplete="current-password" required>
+          </div>
+
+          <button class="btn-primary" type="submit">Sign In to Dashboard</button>
+        </form>
+
+        <p class="login-footer">Biometric Fingerprint Employee Attendance System</p>
+      </section>
     </section>
   </main>
 </body>

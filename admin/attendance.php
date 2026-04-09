@@ -234,53 +234,104 @@ foreach ($rows as $row) {
   <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">Attendance System</div>
-      <nav class="nav-group">
-        <a href="dashboard.php" class="nav-link">Dashboard</a>
-        <a href="employees.php" class="nav-link">Employees</a>
-        <a href="attendance.php" class="nav-link active">Attendance</a>
-        <a href="dtr.php" class="nav-link">DTR</a>
-        <a href="logout.php" class="nav-link">Logout</a>
+  <div class="dashboard-layout">
+    <aside class="dashboard-sidebar">
+      <div class="dashboard-brand">
+        <div>
+          <strong>Attendance</strong>
+          <span>System</span>
+        </div>
+      </div>
+
+      <nav class="dashboard-nav" aria-label="Main Navigation">
+        <div class="dashboard-nav-main">
+          <a href="dashboard.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3z"></path><path d="M13 21h8v-6h-8z"></path><path d="M13 3h8v6h-8z"></path><path d="M3 21h8v-6H3z"></path></svg>
+            Dashboard
+          </a>
+          <a href="employees.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="M20 8v6"></path><path d="M23 11h-6"></path></svg>
+            Employees
+          </a>
+          <a href="attendance.php" class="dashboard-nav-link active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path><path d="M8 14h3"></path></svg>
+            Attendance
+          </a>
+          <a href="dtr.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
+            DTR
+          </a>
+        </div>
+
+        <div class="dashboard-nav-bottom">
+          <a href="logout.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
+            Logout
+          </a>
+        </div>
       </nav>
     </aside>
 
-    <main class="main-panel">
-      <header class="topbar">
-        <h1 class="page-title">Attendance Logs</h1>
-        <div class="admin-pill">
+    <main class="dashboard-main">
+      <header class="dashboard-header">
+        <div>
+          <h1 class="dashboard-title">Attendance Logs</h1>
+          <p class="dashboard-subtitle">View and filter daily attendance records</p>
+        </div>
+
+        <div class="dashboard-profile-pill">
           <span class="dot" aria-hidden="true"></span>
           Admin: <?= e($adminName) ?>
         </div>
       </header>
 
-      <section class="content">
-        <div class="card-grid card-grid-4">
-          <article class="stat-card">
-            <p class="stat-title">Total Logs</p>
-            <p class="stat-value"><?= e((string) $totalLogs) ?></p>
+      <section class="dashboard-content">
+        <div class="dashboard-stats">
+          <article class="dashboard-stat-card accent-teal">
+            <div class="stat-icon-wrap teal">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="3" width="10" height="18" rx="2"></rect><path d="M9 7h6"></path><path d="M9 11h6"></path><path d="M9 15h4"></path></svg>
+            </div>
+            <div>
+              <p class="stat-label">Total Logs</p>
+              <p class="stat-number"><?= e((string) $totalLogs) ?></p>
+            </div>
           </article>
-          <article class="stat-card">
-            <p class="stat-title">On Time</p>
-            <p class="stat-value"><?= e((string) $onTimeCount) ?></p>
+
+          <article class="dashboard-stat-card accent-green">
+            <div class="stat-icon-wrap green">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="m17 11 2 2 4-4"></path></svg>
+            </div>
+            <div>
+              <p class="stat-label">On Time</p>
+              <p class="stat-number"><?= e((string) $onTimeCount) ?></p>
+            </div>
           </article>
-          <article class="stat-card">
-            <p class="stat-title">Late</p>
-            <p class="stat-value"><?= e((string) $lateCount) ?></p>
+
+          <article class="dashboard-stat-card accent-amber">
+            <div class="stat-icon-wrap amber">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
+            </div>
+            <div>
+              <p class="stat-label">Late</p>
+              <p class="stat-number"><?= e((string) $lateCount) ?></p>
+            </div>
           </article>
-          <article class="stat-card">
-            <p class="stat-title">Total Worked</p>
-            <p class="stat-value"><?= e(formatMinutes($totalMinutes)) ?></p>
+
+          <article class="dashboard-stat-card accent-teal">
+            <div class="stat-icon-wrap teal">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"></circle><path d="M12 13l3-3"></path><path d="M9 3h6"></path></svg>
+            </div>
+            <div>
+              <p class="stat-label">Total Worked</p>
+              <p class="stat-number"><?= e(formatMinutes($totalMinutes)) ?></p>
+            </div>
           </article>
         </div>
 
-        <article class="card">
-          <div class="card-header-row">
-            <h2 class="card-title">Filter Attendance</h2>
-            <div class="download-actions">
-              <a class="btn-secondary" href="../biometrics%20scanner/index.php">Open Biometric Scanner</a>
-            </div>
+        <article class="dashboard-panel employee-panel">
+          <div class="employee-panel-head">
+            <h2 class="panel-title">Filter Attendance</h2>
+            <a class="qa-btn qa-secondary" href="../biometrics%20scanner/index.php">Open Biometric Scanner</a>
           </div>
 
           <form class="attendance-filter" method="get" action="attendance.php">
@@ -314,10 +365,10 @@ foreach ($rows as $row) {
           </form>
         </article>
 
-        <article class="card">
-          <h2 class="card-title">Daily Attendance Table</h2>
+        <article class="dashboard-panel employee-panel">
+          <h2 class="panel-title">Daily Attendance Table</h2>
           <div class="table-wrap">
-            <table class="timecard">
+            <table class="timecard employee-table">
               <thead>
                 <tr>
                   <th>#</th>

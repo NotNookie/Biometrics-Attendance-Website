@@ -187,34 +187,70 @@ $adminName = $_SESSION['admin_name'] ?? 'Admin';
   <link rel="stylesheet" href="../assets/style.css">
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">Attendance System</div>
-      <nav class="nav-group">
-        <a href="dashboard.php" class="nav-link">Dashboard</a>
-        <a href="employees.php" class="nav-link">Employees</a>
-        <a href="attendance.php" class="nav-link">Attendance</a>
-        <a href="dtr.php" class="nav-link active">DTR</a>
-        <a href="logout.php" class="nav-link">Logout</a>
+  <div class="dashboard-layout">
+    <aside class="dashboard-sidebar">
+      <div class="dashboard-brand">
+        <div>
+          <strong>Attendance</strong>
+          <span>System</span>
+        </div>
+      </div>
+
+      <nav class="dashboard-nav" aria-label="Main Navigation">
+        <div class="dashboard-nav-main">
+          <a href="dashboard.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3z"></path><path d="M13 21h8v-6h-8z"></path><path d="M13 3h8v6h-8z"></path><path d="M3 21h8v-6H3z"></path></svg>
+            Dashboard
+          </a>
+          <a href="employees.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="M20 8v6"></path><path d="M23 11h-6"></path></svg>
+            Employees
+          </a>
+          <a href="attendance.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path><path d="M8 14h3"></path></svg>
+            Attendance
+          </a>
+          <a href="dtr.php" class="dashboard-nav-link active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
+            DTR
+          </a>
+        </div>
+
+        <div class="dashboard-nav-bottom">
+          <a href="logout.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
+            Logout
+          </a>
+        </div>
       </nav>
     </aside>
 
-    <main class="main-panel">
-      <header class="topbar">
-        <h1 class="page-title">Attendance Time Card</h1>
-        <div class="admin-pill">
+    <main class="dashboard-main">
+      <header class="dashboard-header">
+        <div>
+          <h1 class="dashboard-title">Attendance Time Card</h1>
+          <p class="dashboard-subtitle">Detailed daily time records and total hours</p>
+        </div>
+
+        <div class="dashboard-profile-pill">
           <span class="dot" aria-hidden="true"></span>
           Admin: <?= e($adminName) ?>
         </div>
       </header>
 
-      <section class="content">
+      <section class="dashboard-content">
 
         <!-- FILTER CARD -->
-        <article class="card">
-          <h2 class="card-title">Filter Time Card</h2>
+        <article class="dashboard-panel employee-panel">
+          <div class="employee-panel-head">
+            <h2 class="panel-title">Filter Time Card</h2>
+            <div class="quick-actions">
+              <a class="qa-btn qa-secondary" href="?employee=<?= urlencode((string)$selectedEmployee) ?>&amp;from=<?= urlencode($fromDate) ?>&amp;to=<?= urlencode($toDate) ?>&amp;download=csv">Download CSV</a>
+              <a class="qa-btn qa-secondary" href="?employee=<?= urlencode((string)$selectedEmployee) ?>&amp;from=<?= urlencode($fromDate) ?>&amp;to=<?= urlencode($toDate) ?>&amp;download=xls">Download Excel</a>
+            </div>
+          </div>
 
-          <form method="GET" class="filter-bar">
+          <form method="GET" class="attendance-filter">
             <div>
               <label for="employee">Employee</label>
               <select id="employee" name="employee">
@@ -240,22 +276,14 @@ $adminName = $_SESSION['admin_name'] ?? 'Admin';
               <label>&nbsp;</label>
               <button class="btn-primary" type="submit">View Reports</button>
             </div>
-
-            <div>
-              <label>&nbsp;</label>
-              <a class="btn-primary" style="text-decoration:none;display:inline-block;text-align:center;"
-                 href="?employee=<?= urlencode((string)$selectedEmployee) ?>&from=<?= urlencode($fromDate) ?>&to=<?= urlencode($toDate) ?>&download=csv">
-                 Download CSV
-              </a>
-            </div>
           </form>
         </article>
 
         <!-- DTR TABLE -->
-        <article class="card">
-          <h2 class="card-title">DTR / Time Card Table</h2>
+        <article class="dashboard-panel employee-panel">
+          <h2 class="panel-title">DTR / Time Card Table</h2>
           <div class="table-wrap">
-            <table class="timecard">
+            <table class="timecard employee-table">
               <thead>
                 <tr>
                   <th>Date</th>
@@ -308,10 +336,10 @@ $adminName = $_SESSION['admin_name'] ?? 'Admin';
         </article>
 
         <!-- SUMMARY -->
-        <article class="card">
-          <h2 class="card-title">Summary Total Hours</h2>
+        <article class="dashboard-panel employee-panel">
+          <h2 class="panel-title">Summary Total Hours</h2>
           <div class="table-wrap">
-            <table class="timecard">
+            <table class="timecard employee-table">
               <thead>
                 <tr>
                   <th>Employee</th>
