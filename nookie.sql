@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Generation Time: Apr 08, 2026 at 11:52 PM
+-- Generation Time: Apr 09, 2026 at 12:18 PM
 -- Server version: 8.4.7
 -- PHP Version: 8.3.28
 
@@ -20,6 +20,27 @@ SET time_zone = "+00:00";
 --
 -- Database: `nookie`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `admins`
+--
+
+DROP TABLE IF EXISTS `admins`;
+CREATE TABLE IF NOT EXISTS `admins` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `username` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `password` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `admins`
+--
+
+INSERT INTO `admins` (`id`, `username`, `password`) VALUES
+(1, 'admin', 'admin');
 
 -- --------------------------------------------------------
 
@@ -41,7 +62,7 @@ CREATE TABLE IF NOT EXISTS `attendance` (
   `absence` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `transfer` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=29 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `attendance`
@@ -70,7 +91,37 @@ INSERT INTO `attendance` (`id`, `employee_key`, `date`, `schedule_start`, `sched
 (20, 'anna_reyes', '2026-04-02', '08:30:00', '17:30:00', 'Regular', 1.00, '08:45:00', '17:30:00', 'Late', 'Finance'),
 (21, 'anna_reyes', '2026-04-03', '08:30:00', '17:30:00', 'Regular', 1.00, '08:20:00', '17:40:00', 'None', 'Finance'),
 (22, 'anna_reyes', '2026-04-04', '08:30:00', '17:30:00', 'Regular', 1.00, NULL, NULL, 'Absent', 'Finance'),
-(23, 'john_doe', '2026-04-09', '08:00:00', '17:00:00', 'Regular', 1.00, '07:40:03', '07:41:23', 'None', 'HQ');
+(23, 'john_doe', '2026-04-09', '08:00:00', '17:00:00', 'Regular', 1.00, '07:40:03', '07:41:23', 'None', 'HQ'),
+(24, 'juan_cruz', '2026-04-09', '08:00:00', '17:00:00', 'Regular', 1.00, '07:57:26', '07:58:31', 'None', 'HQ'),
+(25, 'maria_santos', '2026-04-09', '08:00:00', '17:00:00', 'Regular', 1.00, '08:01:41', NULL, 'Late', 'HQ'),
+(26, 'ilele_ray', '2026-04-09', '08:00:00', '17:00:00', 'Regular', 1.00, '14:36:17', '14:36:50', 'Late', 'HQ'),
+(27, '4I5PEI', '2026-04-09', '08:00:00', '17:00:00', 'Regular', 1.00, '15:11:45', '15:11:49', 'Late', 'HQ'),
+(28, 'EIYF13', '2026-04-09', '08:00:00', '17:00:00', 'Regular', 1.00, '18:42:15', NULL, 'Late', 'HQ');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `biometric_devices`
+--
+
+DROP TABLE IF EXISTS `biometric_devices`;
+CREATE TABLE IF NOT EXISTS `biometric_devices` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `device_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `ip_address` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `port` int DEFAULT '4370',
+  `status` enum('connected','disconnected') COLLATE utf8mb4_unicode_ci DEFAULT 'disconnected',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `biometric_devices`
+--
+
+INSERT INTO `biometric_devices` (`id`, `device_name`, `ip_address`, `port`, `status`, `created_at`) VALUES
+(1, 'Ztecko', '192.168.2.2', 4370, 'disconnected', '2026-04-09 06:27:22'),
+(2, 'Ztecko', '192.168.2.2', 4370, 'disconnected', '2026-04-09 06:28:30');
 
 -- --------------------------------------------------------
 
@@ -81,22 +132,27 @@ INSERT INTO `attendance` (`id`, `employee_key`, `date`, `schedule_start`, `sched
 DROP TABLE IF EXISTS `employees`;
 CREATE TABLE IF NOT EXISTS `employees` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `employee_key` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `employee_key` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `department` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `position` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `email` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mobile` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `shift_in` time NOT NULL,
+  `shift_out` time NOT NULL,
+  `status` enum('Active','Inactive') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'Active',
   PRIMARY KEY (`id`),
   UNIQUE KEY `employee_key` (`employee_key`)
-) ENGINE=MyISAM AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `employees`
 --
 
-INSERT INTO `employees` (`id`, `employee_key`, `name`) VALUES
-(1, 'john_doe', 'John Doe'),
-(2, 'ilele_ray', 'Ilele Ray'),
-(3, 'maria_santos', 'Maria Santos'),
-(4, 'juan_cruz', 'Juan Cruz'),
-(5, 'anna_reyes', 'Anna Reyes');
+INSERT INTO `employees` (`id`, `employee_key`, `name`, `department`, `position`, `email`, `mobile`, `shift_in`, `shift_out`, `status`) VALUES
+(1, '4I5PEI', 'Mady Evangelista', 'IT', 'Wala lang', 'Biot@gmail.com', '093121312', '08:00:00', '17:00:00', 'Active'),
+(2, 'XATOZX', 'Jey', 'HR', 'HR', 'dasdas@gmail.com', '098', '09:00:00', '19:00:00', 'Active'),
+(3, 'EIYF13', 'Mr. Bean', 'IT', 'Consultant', 'bean@gmail.com', '097127362', '07:00:00', '21:00:00', 'Active');
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -5,9 +5,12 @@ declare(strict_types=1);
 session_start();
 
 if (!isset($_SESSION['admin_name']) || trim((string) $_SESSION['admin_name']) === '') {
-  header('Location: login.php');
-  exit;
+    header('Location: login.php');
+    exit;
 }
+
+require_once __DIR__ . '/../config/database.php';
+$pdo = get_pdo_connection();
 
 $adminName = trim((string) $_SESSION['admin_name']);
 
@@ -24,16 +27,20 @@ function isValidDate(string $value): bool
 
 function toMinutes(?string $time): ?int
 {
-    if ($time === null || $time === '') {
+    if ($time === null || trim($time) === '') {
         return null;
     }
 
-    $clock = DateTime::createFromFormat('H:i', $time);
-    if (!$clock instanceof DateTime) {
-        return null;
+    $formats = ['Y-m-d H:i:s', 'H:i:s', 'H:i'];
+
+    foreach ($formats as $format) {
+        $clock = DateTime::createFromFormat($format, $time);
+        if ($clock instanceof DateTime) {
+            return ((int) $clock->format('H') * 60) + (int) $clock->format('i');
+        }
     }
 
-    return ((int) $clock->format('H') * 60) + (int) $clock->format('i');
+    return null;
 }
 
 function durationMinutes(?string $start, ?string $end): ?int
@@ -61,23 +68,27 @@ function formatMinutes(int $minutes): string
 
 function formatClock(?string $time): string
 {
-    if ($time === null || $time === '') {
+    if ($time === null || trim($time) === '') {
         return '-';
     }
 
-    $clock = DateTime::createFromFormat('H:i', $time);
-    if (!$clock instanceof DateTime) {
-        return '-';
+    $formats = ['Y-m-d H:i:s', 'H:i:s', 'H:i'];
+
+    foreach ($formats as $format) {
+        $clock = DateTime::createFromFormat($format, $time);
+        if ($clock instanceof DateTime) {
+            return $clock->format('h:i A');
+        }
     }
 
-    return $clock->format('h:i A');
+    return '-';
 }
 
 function attendanceStatus(array $record): string
 {
-    $timeIn = (string) ($record['time_in'] ?? '');
-    $timeOut = (string) ($record['time_out'] ?? '');
-    $shiftStart = (string) ($record['shift_start'] ?? '');
+    $timeIn = trim((string) ($record['time_in'] ?? ''));
+    $timeOut = trim((string) ($record['time_out'] ?? ''));
+    $scheduleStart = trim((string) ($record['schedule_start'] ?? ''));
 
     if ($timeIn === '') {
         return 'Absent';
@@ -87,7 +98,8 @@ function attendanceStatus(array $record): string
         return 'Incomplete';
     }
 
-    $lateMinutes = durationMinutes($shiftStart, $timeIn);
+    $lateMinutes = durationMinutes($scheduleStart, $timeIn);
+
     if ($lateMinutes !== null && $lateMinutes > 10) {
         return 'Late';
     }
@@ -95,70 +107,47 @@ function attendanceStatus(array $record): string
     return 'On Time';
 }
 
-$records = [
-    [
-        'date' => '2026-04-08',
-        'employee_name' => 'John Doe',
-        'department' => 'Marketing',
-        'shift_start' => '08:00',
-        'shift_end' => '17:00',
-        'time_in' => '08:03',
-        'time_out' => '17:04',
-        'source' => 'Biometric Scanner',
-    ],
-    [
-        'date' => '2026-04-08',
-        'employee_name' => 'Ilele Ray',
-        'department' => 'Production',
-        'shift_start' => '07:00',
-        'shift_end' => '16:00',
-        'time_in' => '07:12',
-        'time_out' => '16:00',
-        'source' => 'Biometric Scanner',
-    ],
-    [
-        'date' => '2026-04-08',
-        'employee_name' => 'Angela Smith',
-        'department' => 'HR',
-        'shift_start' => '08:30',
-        'shift_end' => '17:30',
-        'time_in' => '08:29',
-        'time_out' => '',
-        'source' => 'Biometric Scanner',
-    ],
-    [
-        'date' => '2026-04-08',
-        'employee_name' => 'Mark Tyson',
-        'department' => 'IT',
-        'shift_start' => '09:00',
-        'shift_end' => '18:00',
-        'time_in' => '',
-        'time_out' => '',
-        'source' => 'Manual',
-    ],
-    [
-        'date' => '2026-04-07',
-        'employee_name' => 'John Doe',
-        'department' => 'Marketing',
-        'shift_start' => '08:00',
-        'shift_end' => '17:00',
-        'time_in' => '08:01',
-        'time_out' => '17:02',
-        'source' => 'Biometric Scanner',
-    ],
-];
+function getEmployeeTableColumns(PDO $pdo): array
+{
+  $columns = [];
 
-$departments = ['all' => 'All Departments'];
-foreach ($records as $record) {
-    $department = (string) $record['department'];
-    $key = strtolower(str_replace(' ', '_', $department));
-    $departments[$key] = $department;
+  $stmt = $pdo->query('SHOW COLUMNS FROM employees');
+  while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    if (isset($row['Field'])) {
+      $columns[] = (string) $row['Field'];
+    }
+  }
+
+  return $columns;
 }
 
+$employeeTableColumns = getEmployeeTableColumns($pdo);
+$hasDepartmentColumn = in_array('department', $employeeTableColumns, true);
+
+/* ================= FILTERS ================= */
 $today = date('Y-m-d');
-$selectedDate = $_GET['date'] ?? '2026-04-08';
+$selectedDate = $_GET['date'] ?? $today;
+
 if (!isValidDate($selectedDate)) {
     $selectedDate = $today;
+}
+
+/* ================= FETCH DEPARTMENTS ================= */
+$departments = ['all' => 'All Departments'];
+
+if ($hasDepartmentColumn) {
+  $deptStmt = $pdo->query("
+    SELECT DISTINCT department
+    FROM employees
+    WHERE department IS NOT NULL AND department != ''
+    ORDER BY department ASC
+  ");
+
+  while ($dept = $deptStmt->fetch(PDO::FETCH_ASSOC)) {
+    $department = trim((string) $dept['department']);
+    $key = strtolower(str_replace(' ', '_', $department));
+    $departments[$key] = $department;
+  }
 }
 
 $selectedDepartment = $_GET['department'] ?? 'all';
@@ -179,42 +168,72 @@ if (!array_key_exists($selectedStatus, $statusOptions)) {
     $selectedStatus = 'all';
 }
 
+/* ================= FETCH ATTENDANCE FROM DB ================= */
+$sql = "
+    SELECT 
+        a.employee_key,
+        a.date,
+        a.time_in,
+        a.time_out,
+        a.schedule_start,
+        a.schedule_end,
+        e.name AS employee_name,
+    " . ($hasDepartmentColumn ? 'e.department' : "'N/A' AS department") . "
+    FROM attendance a
+    INNER JOIN employees e ON a.employee_key = e.employee_key
+    WHERE a.date = :selected_date
+";
+
+$params = [
+    ':selected_date' => $selectedDate
+];
+
+if ($hasDepartmentColumn && $selectedDepartment !== 'all') {
+    $sql .= " AND LOWER(REPLACE(e.department, ' ', '_')) = :department";
+    $params[':department'] = $selectedDepartment;
+}
+
+$sql .= " ORDER BY e.name ASC, a.time_in ASC";
+
+$stmt = $pdo->prepare($sql);
+$stmt->execute($params);
+$records = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+/* ================= BUILD TABLE ROWS ================= */
 $rows = [];
+
 foreach ($records as $record) {
-    if ($record['date'] !== $selectedDate) {
-        continue;
-    }
-
-    $departmentKey = strtolower(str_replace(' ', '_', (string) $record['department']));
-    if ($selectedDepartment !== 'all' && $selectedDepartment !== $departmentKey) {
-        continue;
-    }
-
     $status = attendanceStatus($record);
     $statusKey = strtolower(str_replace(' ', '_', $status));
+
     if ($selectedStatus !== 'all' && $selectedStatus !== $statusKey) {
         continue;
     }
 
-    $workMinutes = durationMinutes((string) $record['time_in'], (string) $record['time_out']);
+    $workMinutes = durationMinutes(
+        $record['time_in'] ?? null,
+        $record['time_out'] ?? null
+    );
 
     $rows[] = [
-        'employee_name' => (string) $record['employee_name'],
-        'department' => (string) $record['department'],
-        'shift' => formatClock((string) $record['shift_start']) . ' - ' . formatClock((string) $record['shift_end']),
-        'time_in' => formatClock((string) $record['time_in']),
-        'time_out' => formatClock((string) $record['time_out']),
+        'employee_name' => (string) ($record['employee_name'] ?? 'Unknown'),
+        'department' => (string) ($record['department'] ?? 'N/A'),
+        'shift' => formatClock($record['schedule_start'] ?? null) . ' - ' . formatClock($record['schedule_end'] ?? null),
+        'time_in' => formatClock($record['time_in'] ?? null),
+        'time_out' => formatClock($record['time_out'] ?? null),
         'hours' => $workMinutes === null ? 'Incomplete' : formatMinutes($workMinutes),
         'status' => $status,
-        'source' => (string) $record['source'],
+        'source' => 'Biometric Scanner',
         'minutes' => $workMinutes,
     ];
 }
 
+/* ================= STATS ================= */
 $totalLogs = count($rows);
 $onTimeCount = count(array_filter($rows, static fn(array $row): bool => $row['status'] === 'On Time'));
 $lateCount = count(array_filter($rows, static fn(array $row): bool => $row['status'] === 'Late'));
 $incompleteCount = count(array_filter($rows, static fn(array $row): bool => $row['status'] === 'Incomplete'));
+
 $totalMinutes = 0;
 foreach ($rows as $row) {
     if (is_int($row['minutes'])) {
@@ -260,10 +279,6 @@ foreach ($rows as $row) {
           <a href="dtr.php" class="dashboard-nav-link">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
             DTR
-          </a>
-          <a href="../biometrics%20scanner/index.php" class="dashboard-nav-link">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a4 4 0 0 1 4 4"></path><path d="M12 3a4 4 0 0 0-4 4"></path><path d="M12 21a8 8 0 0 0 8-8"></path><path d="M12 21a8 8 0 0 1-8-8"></path><path d="M12 9a4 4 0 0 1 4 4"></path><path d="M12 9a4 4 0 0 0-4 4"></path></svg>
-            Biometric Scanner
           </a>
         </div>
 

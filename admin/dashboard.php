@@ -1,15 +1,147 @@
 <?php
-
 declare(strict_types=1);
 
 session_start();
 
 if (!isset($_SESSION['admin_name']) || trim((string) $_SESSION['admin_name']) === '') {
-  header('Location: login.php');
-  exit;
+    header('Location: login.php');
+    exit;
 }
 
+require_once __DIR__ . '/../config/database.php';
+$pdo = get_pdo_connection();
+
 $adminName = trim((string) $_SESSION['admin_name']);
+
+/* ================= HELPERS ================= */
+function e(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+function formatClock(?string $time): string
+{
+    if (!$time) return '-';
+
+    $formats = ['Y-m-d H:i:s', 'H:i:s', 'H:i'];
+    foreach ($formats as $format) {
+        $clock = DateTime::createFromFormat($format, $time);
+        if ($clock) {
+            return $clock->format('h:i A');
+        }
+    }
+
+    return '-';
+}
+
+function toMinutes(?string $time): ?int
+{
+    if (!$time) return null;
+
+    $formats = ['Y-m-d H:i:s', 'H:i:s', 'H:i'];
+    foreach ($formats as $format) {
+        $clock = DateTime::createFromFormat($format, $time);
+        if ($clock) {
+            return ((int)$clock->format('H') * 60) + (int)$clock->format('i');
+        }
+    }
+
+    return null;
+}
+
+function isLate(?string $scheduleStart, ?string $timeIn): bool
+{
+    $scheduleMinutes = toMinutes($scheduleStart);
+    $timeInMinutes = toMinutes($timeIn);
+
+    if ($scheduleMinutes === null || $timeInMinutes === null) {
+        return false;
+    }
+
+    return $timeInMinutes > $scheduleMinutes;
+}
+
+/* ================= TODAY ================= */
+$today = date('Y-m-d');
+
+/* ================= TOTAL EMPLOYEES ================= */
+$stmt = $pdo->query("SELECT COUNT(*) FROM employees");
+$totalEmployees = (int)$stmt->fetchColumn();
+
+/* ================= TODAY'S ATTENDANCE ================= */
+$stmt = $pdo->prepare("
+    SELECT a.*, e.name
+    FROM attendance a
+    JOIN employees e ON a.employee_key = e.employee_key
+    WHERE a.date = :today
+");
+$stmt->execute([':today' => $today]);
+$todayRecords = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$presentToday = 0;
+$lateToday = 0;
+$attendanceEmployeeKeys = [];
+
+foreach ($todayRecords as $record) {
+    $attendanceEmployeeKeys[] = $record['employee_key'];
+
+    if (!empty($record['time_in'])) {
+        $presentToday++;
+
+        if (isLate($record['schedule_start'] ?? null, $record['time_in'] ?? null)) {
+            $lateToday++;
+        }
+    }
+}
+
+/* ================= ABSENT TODAY ================= */
+/*
+Absent = total employees - employees who have timed in today
+*/
+$absentToday = $totalEmployees - $presentToday;
+if ($absentToday < 0) {
+    $absentToday = 0;
+}
+
+/* ================= WEEKLY CHART DATA ================= */
+$chartLabels = [];
+$presentData = [];
+$absentData = [];
+
+for ($i = 4; $i >= 0; $i--) {
+    $date = date('Y-m-d', strtotime("-$i day"));
+    $label = date('D', strtotime($date));
+
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) 
+        FROM attendance
+        WHERE date = :date
+          AND time_in IS NOT NULL
+          AND time_in != ''
+    ");
+    $stmt->execute([':date' => $date]);
+    $presentCount = (int)$stmt->fetchColumn();
+
+    $absentCount = $totalEmployees - $presentCount;
+    if ($absentCount < 0) $absentCount = 0;
+
+    $chartLabels[] = $label;
+    $presentData[] = $presentCount;
+    $absentData[] = $absentCount;
+}
+
+/* ================= RECENT ACTIVITY ================= */
+$stmt = $pdo->prepare("
+    SELECT a.*, e.name
+    FROM attendance a
+    JOIN employees e ON a.employee_key = e.employee_key
+    WHERE a.date = :today
+    ORDER BY 
+        COALESCE(a.time_out, a.time_in) DESC
+    LIMIT 8
+");
+$stmt->execute([':today' => $today]);
+$recentActivities = $stmt->fetchAll(PDO::FETCH_ASSOC);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -51,10 +183,6 @@ $adminName = trim((string) $_SESSION['admin_name']);
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
             DTR
           </a>
-          <a href="../biometrics%20scanner/index.php" class="dashboard-nav-link">
-            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a4 4 0 0 1 4 4"></path><path d="M12 3a4 4 0 0 0-4 4"></path><path d="M12 21a8 8 0 0 0 8-8"></path><path d="M12 21a8 8 0 0 1-8-8"></path><path d="M12 9a4 4 0 0 1 4 4"></path><path d="M12 9a4 4 0 0 0-4 4"></path></svg>
-            Biometric Scanner
-          </a>
         </div>
 
         <div class="dashboard-nav-bottom">
@@ -75,7 +203,7 @@ $adminName = trim((string) $_SESSION['admin_name']);
 
         <div class="dashboard-profile-pill">
           <span class="dot" aria-hidden="true"></span>
-          Admin: <?= htmlspecialchars($adminName, ENT_QUOTES, 'UTF-8') ?>
+          Admin: <?= e($adminName) ?>
         </div>
       </header>
 
@@ -87,7 +215,7 @@ $adminName = trim((string) $_SESSION['admin_name']);
             </div>
             <div>
               <p class="stat-label">Total Employees</p>
-              <p class="stat-number">128</p>
+              <p class="stat-number"><?= e((string)$totalEmployees) ?></p>
             </div>
           </article>
 
@@ -97,7 +225,7 @@ $adminName = trim((string) $_SESSION['admin_name']);
             </div>
             <div>
               <p class="stat-label">Present Today</p>
-              <p class="stat-number">117</p>
+              <p class="stat-number"><?= e((string)$presentToday) ?></p>
             </div>
           </article>
 
@@ -107,7 +235,7 @@ $adminName = trim((string) $_SESSION['admin_name']);
             </div>
             <div>
               <p class="stat-label">Absent Today</p>
-              <p class="stat-number">11</p>
+              <p class="stat-number"><?= e((string)$absentToday) ?></p>
             </div>
           </article>
 
@@ -117,7 +245,7 @@ $adminName = trim((string) $_SESSION['admin_name']);
             </div>
             <div>
               <p class="stat-label">Late Today</p>
-              <p class="stat-number">3</p>
+              <p class="stat-number"><?= e((string)$lateToday) ?></p>
             </div>
           </article>
         </div>
@@ -133,41 +261,37 @@ $adminName = trim((string) $_SESSION['admin_name']);
           <article class="dashboard-panel panel-activity">
             <h2 class="panel-title">Recent Activity</h2>
             <ul class="activity-list">
-              <li class="activity-item">
-                <span class="activity-dot" aria-hidden="true"></span>
-                <div>
-                  <p class="activity-text">John Doe clocked in</p>
-                  <p class="activity-time">08:03 AM</p>
-                </div>
-              </li>
-              <li class="activity-item">
-                <span class="activity-dot" aria-hidden="true"></span>
-                <div>
-                  <p class="activity-text">Ilele Ray clocked in</p>
-                  <p class="activity-time">07:12 AM</p>
-                </div>
-              </li>
-              <li class="activity-item">
-                <span class="activity-dot" aria-hidden="true"></span>
-                <div>
-                  <p class="activity-text">Angela Smith clocked in</p>
-                  <p class="activity-time">08:29 AM</p>
-                </div>
-              </li>
-              <li class="activity-item">
-                <span class="activity-dot" aria-hidden="true"></span>
-                <div>
-                  <p class="activity-text">Maria Santos clocked out</p>
-                  <p class="activity-time">06:10 PM</p>
-                </div>
-              </li>
-              <li class="activity-item">
-                <span class="activity-dot" aria-hidden="true"></span>
-                <div>
-                  <p class="activity-text">Juan Cruz clocked out</p>
-                  <p class="activity-time">04:30 PM</p>
-                </div>
-              </li>
+              <?php if (count($recentActivities) > 0): ?>
+                <?php foreach ($recentActivities as $activity): ?>
+                  <?php
+                    $action = 'has attendance record';
+                    $activityTime = '-';
+
+                    if (!empty($activity['time_out'])) {
+                        $action = 'clocked out';
+                        $activityTime = formatClock($activity['time_out']);
+                    } elseif (!empty($activity['time_in'])) {
+                        $action = 'clocked in';
+                        $activityTime = formatClock($activity['time_in']);
+                    }
+                  ?>
+                  <li class="activity-item">
+                    <span class="activity-dot" aria-hidden="true"></span>
+                    <div>
+                      <p class="activity-text"><?= e($activity['name']) ?> <?= e($action) ?></p>
+                      <p class="activity-time"><?= e($activityTime) ?></p>
+                    </div>
+                  </li>
+                <?php endforeach; ?>
+              <?php else: ?>
+                <li class="activity-item">
+                  <span class="activity-dot" aria-hidden="true"></span>
+                  <div>
+                    <p class="activity-text">No attendance activity for today.</p>
+                    <p class="activity-time">--</p>
+                  </div>
+                </li>
+              <?php endif; ?>
             </ul>
           </article>
         </div>
@@ -194,18 +318,18 @@ $adminName = trim((string) $_SESSION['admin_name']);
       var chartInstance = new Chart(canvas, {
         type: 'bar',
         data: {
-          labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'],
+          labels: <?= json_encode($chartLabels) ?>,
           datasets: [
             {
               label: 'Present',
-              data: [117, 120, 122, 119, 120],
+              data: <?= json_encode($presentData) ?>,
               backgroundColor: '#14B8A6',
               borderRadius: 6,
               borderSkipped: false
             },
             {
               label: 'Absent',
-              data: [12, 10, 8, 11, 11],
+              data: <?= json_encode($absentData) ?>,
               backgroundColor: '#EF4444',
               borderRadius: 6,
               borderSkipped: false
@@ -248,7 +372,8 @@ $adminName = trim((string) $_SESSION['admin_name']);
                 borderDash: [4, 4]
               },
               ticks: {
-                color: '#64748B'
+                color: '#64748B',
+                precision: 0
               }
             }
           }

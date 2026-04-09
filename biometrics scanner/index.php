@@ -8,19 +8,138 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../assets/style.css">
 
     <style>
+        :root {
+            --sidebar: #132238;
+            --sidebar-soft: #1e293b;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --border: #e2e8f0;
+            --text: #0f172a;
+            --muted: #64748b;
+            --teal: #14b8a6;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Plus Jakarta Sans", "Manrope", sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .scanner-layout {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 230px 1fr;
+        }
+
+        .scanner-sidebar {
+            background: var(--sidebar);
+            border-right: 1px solid #1f314a;
+            color: #d3dfef;
+            padding: 24px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+
+        .brand {
+            border-bottom: 1px solid #28415f;
+            padding-bottom: 18px;
+        }
+
+        .brand strong {
+            display: block;
+            font-size: 2rem;
+            line-height: 1;
+            color: #f1f5f9;
+        }
+
+        .brand span {
+            display: block;
+            margin-top: 4px;
+            color: #20d7c4;
+            font-weight: 800;
+        }
+
+        .sidebar-note {
+            color: #9db0c7;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        .status-card {
+            margin-top: auto;
+            background: var(--sidebar-soft);
+            border: 1px solid #2a415f;
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.86rem;
+            color: #d2dfed;
+            margin-bottom: 8px;
+        }
+
+        .status-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--success);
+            margin-right: 6px;
+            display: inline-block;
+        }
+
+        .scanner-main {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .scanner-topbar {
+            background: #ffffff;
+            border-bottom: 1px solid var(--border);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .scanner-topbar h1 {
+            font-size: 2rem;
+            line-height: 1.1;
+            margin: 0;
+        }
+
         .scanner-topbar p {
             margin-top: 4px;
-            color: #64748b;
+            color: var(--muted);
         }
 
         .top-link {
             display: inline-flex;
             align-items: center;
             padding: 10px 12px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border);
             border-radius: 999px;
             color: #334155;
             font-weight: 700;
@@ -35,16 +154,18 @@
         }
 
         .scanner-content {
+            flex: 1;
+            padding: 24px;
             display: grid;
             place-items: center;
         }
 
         .scanner-card {
             width: min(560px, 100%);
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
+            background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 16px;
-            box-shadow: 0 14px 36px rgba(15, 23, 42, 0.1);
+            box-shadow: var(--shadow);
             padding: 28px;
             text-align: center;
         }
@@ -66,19 +187,19 @@
             font-size: 1.7rem;
             margin-bottom: 8px;
             font-weight: 700;
-            color: #0f172a;
+            color: var(--text);
         }
 
         .subtitle {
             font-size: 0.95rem;
-            color: #64748b;
+            color: var(--muted);
             margin-bottom: 20px;
         }
 
         .datetime {
             margin-bottom: 25px;
             background: #f8fafc;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border);
             padding: 12px;
             border-radius: 12px;
             font-size: 14px;
@@ -95,7 +216,7 @@
         .input-group label {
             display: block;
             margin-bottom: 6px;
-            color: #64748b;
+            color: var(--muted);
             font-size: 0.84rem;
             font-weight: 700;
         }
@@ -103,7 +224,7 @@
         .input-group input {
             width: 100%;
             padding: 15px 18px;
-            border: 1px solid #e2e8f0;
+            border: 1px solid var(--border);
             outline: none;
             border-radius: 12px;
             font-size: 16px;
@@ -186,14 +307,14 @@
         .footer {
             margin-top: 20px;
             font-size: 0.82rem;
-            color: #64748b;
+            color: var(--muted);
         }
 
         .loader {
             display: none;
             margin-top: 15px;
             font-size: 0.9rem;
-            color: #64748b;
+            color: var(--muted);
         }
 
         .wave {
@@ -226,6 +347,23 @@
             100% { transform: rotate(0deg); }
         }
 
+        @media (max-width: 980px) {
+            .scanner-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .scanner-sidebar {
+                position: static;
+                border-right: 0;
+                border-bottom: 1px solid #1f314a;
+                gap: 12px;
+            }
+
+            .status-card {
+                margin-top: 0;
+            }
+        }
+
         @media (max-width: 640px) {
             .scanner-topbar {
                 padding: 14px;
@@ -252,59 +390,40 @@
     </style>
 </head>
 <body>
-<div class="dashboard-layout">
-    <aside class="dashboard-sidebar">
-        <div class="dashboard-brand">
-            <div>
-                <strong>Attendance</strong>
-                <span>System</span>
-            </div>
+<div class="scanner-layout">
+    <aside class="scanner-sidebar">
+        <div class="brand">
+            <strong>Attendance</strong>
+            <span>System</span>
         </div>
 
-        <nav class="dashboard-nav" aria-label="Main Navigation">
-            <div class="dashboard-nav-main">
-                <a href="../admin/dashboard.php" class="dashboard-nav-link">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3z"></path><path d="M13 21h8v-6h-8z"></path><path d="M13 3h8v6h-8z"></path><path d="M3 21h8v-6H3z"></path></svg>
-                    Dashboard
-                </a>
-                <a href="../admin/employees.php" class="dashboard-nav-link">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="M20 8v6"></path><path d="M23 11h-6"></path></svg>
-                    Employees
-                </a>
-                <a href="../admin/attendance.php" class="dashboard-nav-link">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path><path d="M8 14h3"></path></svg>
-                    Attendance
-                </a>
-                <a href="../admin/dtr.php" class="dashboard-nav-link">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
-                    DTR
-                </a>
-                <a href="index.php" class="dashboard-nav-link active">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a4 4 0 0 1 4 4"></path><path d="M12 3a4 4 0 0 0-4 4"></path><path d="M12 21a8 8 0 0 0 8-8"></path><path d="M12 21a8 8 0 0 1-8-8"></path><path d="M12 9a4 4 0 0 1 4 4"></path><path d="M12 9a4 4 0 0 0-4 4"></path></svg>
-                    Biometric Scanner
-                </a>
-            </div>
+        <p class="sidebar-note">
+            Biometric attendance terminal for employee time in and time out recording.
+        </p>
 
-            <div class="dashboard-nav-bottom">
-                <a href="../admin/logout.php" class="dashboard-nav-link">
-                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
-                    Logout
-                </a>
+        <div class="status-card" aria-label="Scanner status">
+            <div class="status-item">
+                <span>Device</span>
+                <span><span class="status-dot" aria-hidden="true"></span>Connected</span>
             </div>
-        </nav>
+            <div class="status-item">
+                <span>Server</span>
+                <span><span class="status-dot" aria-hidden="true"></span>Online</span>
+            </div>
+        </div>
     </aside>
 
-    <main class="dashboard-main">
-        <header class="dashboard-header scanner-topbar">
+    <main class="scanner-main">
+        <header class="scanner-topbar">
             <div>
-                <h1 class="dashboard-title">Biometric Scanner</h1>
+                <h1>Biometric Scanner</h1>
                 <p>Record employee attendance from the scanning terminal.</p>
             </div>
             <a class="top-link" href="../admin/attendance.php">Open Attendance Logs</a>
         </header>
 
-        <section class="dashboard-content scanner-content">
-            <article class="dashboard-panel scanner-card">
+        <section class="scanner-content">
+            <div class="scanner-card">
                 <div class="icon" id="handIcon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M6 11V6a1 1 0 1 1 2 0v5"></path>
@@ -335,7 +454,7 @@
                 <div class="footer">
                     Secure Employee Attendance Monitoring System
                 </div>
-            </article>
+            </div>
         </section>
     </main>
 </div>
