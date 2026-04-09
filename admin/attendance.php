@@ -261,6 +261,10 @@ foreach ($rows as $row) {
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
             DTR
           </a>
+          <a href="../biometrics%20scanner/index.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3a4 4 0 0 1 4 4"></path><path d="M12 3a4 4 0 0 0-4 4"></path><path d="M12 21a8 8 0 0 0 8-8"></path><path d="M12 21a8 8 0 0 1-8-8"></path><path d="M12 9a4 4 0 0 1 4 4"></path><path d="M12 9a4 4 0 0 0-4 4"></path></svg>
+            Biometric Scanner
+          </a>
         </div>
 
         <div class="dashboard-nav-bottom">
