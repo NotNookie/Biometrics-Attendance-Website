@@ -1,0 +1,411 @@
+<?php
+declare(strict_types=1);
+
+session_start();
+
+if (!isset($_SESSION['admin_name']) || trim((string) $_SESSION['admin_name']) === '') {
+    header('Location: login.php');
+    exit;
+}
+
+require_once __DIR__ . '/../config/database.php';
+$pdo = get_pdo_connection();
+
+$adminName = trim((string) $_SESSION['admin_name']);
+
+/* ================= HELPERS ================= */
+function e(string $value): string
+{
+    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+}
+
+function formatClock(?string $time): string
+{
+    if (!$time) return '-';
+
+    $formats = ['Y-m-d H:i:s', 'H:i:s', 'H:i'];
+    foreach ($formats as $format) {
+        $clock = DateTime::createFromFormat($format, $time);
+        if ($clock) {
+            return $clock->format('h:i A');
+        }
+    }
+
+    return '-';
+}
+
+function toMinutes(?string $time): ?int
+{
+    if (!$time) return null;
+
+    $formats = ['Y-m-d H:i:s', 'H:i:s', 'H:i'];
+    foreach ($formats as $format) {
+        $clock = DateTime::createFromFormat($format, $time);
+        if ($clock) {
+            return ((int)$clock->format('H') * 60) + (int)$clock->format('i');
+        }
+    }
+
+    return null;
+}
+
+function isLate(?string $scheduleStart, ?string $timeIn): bool
+{
+    $scheduleMinutes = toMinutes($scheduleStart);
+    $timeInMinutes = toMinutes($timeIn);
+
+    if ($scheduleMinutes === null || $timeInMinutes === null) {
+        return false;
+    }
+
+    return $timeInMinutes > $scheduleMinutes;
+}
+
+/* ================= TODAY ================= */
+$today = date('Y-m-d');
+
+/* ================= TOTAL EMPLOYEES ================= */
+$stmt = $pdo->query("SELECT COUNT(*) FROM employees");
+$totalEmployees = (int)$stmt->fetchColumn();
+
+/* ================= TODAY'S ATTENDANCE ================= */
+$stmt = $pdo->prepare("
+    SELECT a.*, e.name
+    FROM attendance a
+    JOIN employees e ON a.employee_key = e.employee_key
+    WHERE a.date = :today
+");
+$stmt->execute([':today' => $today]);
+$todayRecords = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$presentToday = 0;
+$lateToday = 0;
+$attendanceEmployeeKeys = [];
+
+foreach ($todayRecords as $record) {
+    $attendanceEmployeeKeys[] = $record['employee_key'];
+
+    if (!empty($record['time_in'])) {
+        $presentToday++;
+
+        if (isLate($record['schedule_start'] ?? null, $record['time_in'] ?? null)) {
+            $lateToday++;
+        }
+    }
+}
+
+/* ================= ABSENT TODAY ================= */
+/*
+Absent = total employees - employees who have timed in today
+*/
+$absentToday = $totalEmployees - $presentToday;
+if ($absentToday < 0) {
+    $absentToday = 0;
+}
+
+/* ================= WEEKLY CHART DATA ================= */
+$chartLabels = [];
+$presentData = [];
+$absentData = [];
+
+for ($i = 4; $i >= 0; $i--) {
+    $date = date('Y-m-d', strtotime("-$i day"));
+    $label = date('D', strtotime($date));
+
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) 
+        FROM attendance
+        WHERE date = :date
+          AND time_in IS NOT NULL
+          AND time_in != ''
+    ");
+    $stmt->execute([':date' => $date]);
+    $presentCount = (int)$stmt->fetchColumn();
+
+    $absentCount = $totalEmployees - $presentCount;
+    if ($absentCount < 0) $absentCount = 0;
+
+    $chartLabels[] = $label;
+    $presentData[] = $presentCount;
+    $absentData[] = $absentCount;
+}
+
+/* ================= RECENT ACTIVITY ================= */
+$stmt = $pdo->prepare("
+    SELECT a.*, e.name
+    FROM attendance a
+    JOIN employees e ON a.employee_key = e.employee_key
+    WHERE a.date = :today
+    ORDER BY 
+        COALESCE(a.time_out, a.time_in) DESC
+    LIMIT 8
+");
+$stmt->execute([':today' => $today]);
+$recentActivities = $stmt->fetchAll(PDO::FETCH_ASSOC);
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | Biometric Attendance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <aside class="dashboard-sidebar">
+      <div class="dashboard-brand">
+        <div>
+          <strong>Attendance</strong>
+          <span>System</span>
+        </div>
+      </div>
+
+      <nav class="dashboard-nav" aria-label="Main Navigation">
+        <div class="dashboard-nav-main">
+          <a href="dashboard.php" class="dashboard-nav-link active">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 13h8V3H3z"></path><path d="M13 21h8v-6h-8z"></path><path d="M13 3h8v6h-8z"></path><path d="M3 21h8v-6H3z"></path></svg>
+            Dashboard
+          </a>
+          <a href="employees.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="M20 8v6"></path><path d="M23 11h-6"></path></svg>
+            Employees
+          </a>
+          <a href="attendance.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path><path d="M8 14h3"></path></svg>
+            Attendance
+          </a>
+          <a href="dtr.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
+            DTR
+          </a>
+        </div>
+
+        <div class="dashboard-nav-bottom">
+          <a href="logout.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
+            Logout
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="dashboard-main">
+      <header class="dashboard-header">
+        <div>
+          <h1 class="dashboard-title">Admin Dashboard</h1>
+          <p class="dashboard-subtitle">Overview of today's attendance and system metrics</p>
+        </div>
+
+        <div class="dashboard-profile-pill">
+          <span class="dot" aria-hidden="true"></span>
+          Admin: <?= e($adminName) ?>
+        </div>
+      </header>
+
+      <section class="dashboard-content">
+        <div class="dashboard-stats">
+          <article class="dashboard-stat-card accent-teal">
+            <div class="stat-icon-wrap teal">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="M20 8v6"></path><path d="M23 11h-6"></path></svg>
+            </div>
+            <div>
+              <p class="stat-label">Total Employees</p>
+              <p class="stat-number"><?= e((string)$totalEmployees) ?></p>
+            </div>
+          </article>
+
+          <article class="dashboard-stat-card accent-green">
+            <div class="stat-icon-wrap green">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="m17 11 2 2 4-4"></path></svg>
+            </div>
+            <div>
+              <p class="stat-label">Present Today</p>
+              <p class="stat-number"><?= e((string)$presentToday) ?></p>
+            </div>
+          </article>
+
+          <article class="dashboard-stat-card accent-red">
+            <div class="stat-icon-wrap red">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="m20 8-4 4"></path><path d="m16 8 4 4"></path></svg>
+            </div>
+            <div>
+              <p class="stat-label">Absent Today</p>
+              <p class="stat-number"><?= e((string)$absentToday) ?></p>
+            </div>
+          </article>
+
+          <article class="dashboard-stat-card accent-amber">
+            <div class="stat-icon-wrap amber">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 3"></path></svg>
+            </div>
+            <div>
+              <p class="stat-label">Late Today</p>
+              <p class="stat-number"><?= e((string)$lateToday) ?></p>
+            </div>
+          </article>
+        </div>
+
+        <div class="dashboard-main-grid">
+          <article class="dashboard-panel panel-chart">
+            <h2 class="panel-title">Weekly Attendance Overview</h2>
+            <div class="chart-wrap">
+              <canvas id="attendanceChart" aria-label="Weekly attendance chart"></canvas>
+            </div>
+          </article>
+
+          <article class="dashboard-panel panel-activity">
+            <h2 class="panel-title">Recent Activity</h2>
+            <ul class="activity-list">
+              <?php if (count($recentActivities) > 0): ?>
+                <?php foreach ($recentActivities as $activity): ?>
+                  <?php
+                    $action = 'has attendance record';
+                    $activityTime = '-';
+
+                    if (!empty($activity['time_out'])) {
+                        $action = 'clocked out';
+                        $activityTime = formatClock($activity['time_out']);
+                    } elseif (!empty($activity['time_in'])) {
+                        $action = 'clocked in';
+                        $activityTime = formatClock($activity['time_in']);
+                    }
+                  ?>
+                  <li class="activity-item">
+                    <span class="activity-dot" aria-hidden="true"></span>
+                    <div>
+                      <p class="activity-text"><?= e($activity['name']) ?> <?= e($action) ?></p>
+                      <p class="activity-time"><?= e($activityTime) ?></p>
+                    </div>
+                  </li>
+                <?php endforeach; ?>
+              <?php else: ?>
+                <li class="activity-item">
+                  <span class="activity-dot" aria-hidden="true"></span>
+                  <div>
+                    <p class="activity-text">No attendance activity for today.</p>
+                    <p class="activity-time">--</p>
+                  </div>
+                </li>
+              <?php endif; ?>
+            </ul>
+          </article>
+        </div>
+
+        <article class="dashboard-panel quick-actions-panel">
+          <h2 class="panel-title">Quick Actions</h2>
+          <div class="quick-actions">
+            <a href="employees.php?dialog=add" class="qa-btn qa-primary">+ Add Employee</a>
+            <a href="attendance.php" class="qa-btn qa-secondary">View Attendance</a>
+            <a href="dtr.php" class="qa-btn qa-secondary">Generate Report</a>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      var canvas = document.getElementById('attendanceChart');
+      if (!canvas || typeof Chart === 'undefined') {
+        return;
+      }
+
+      var chartInstance = new Chart(canvas, {
+        type: 'bar',
+        data: {
+          labels: <?= json_encode($chartLabels) ?>,
+          datasets: [
+            {
+              label: 'Present',
+              data: <?= json_encode($presentData) ?>,
+              backgroundColor: '#14B8A6',
+              borderRadius: 6,
+              borderSkipped: false
+            },
+            {
+              label: 'Absent',
+              data: <?= json_encode($absentData) ?>,
+              backgroundColor: '#EF4444',
+              borderRadius: 6,
+              borderSkipped: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: {
+                usePointStyle: true,
+                boxWidth: 8,
+                color: '#475569',
+                font: {
+                  size: 12,
+                  family: 'Manrope'
+                }
+              }
+            },
+            tooltip: {
+              backgroundColor: '#0F172A'
+            }
+          },
+          scales: {
+            x: {
+              grid: {
+                display: false
+              },
+              ticks: {
+                color: '#64748B'
+              }
+            },
+            y: {
+              beginAtZero: true,
+              grid: {
+                color: '#E2E8F0',
+                borderDash: [4, 4]
+              },
+              ticks: {
+                color: '#64748B',
+                precision: 0
+              }
+            }
+          }
+        }
+      });
+
+      function forceChartResize() {
+        if (chartInstance) {
+          chartInstance.resize();
+          chartInstance.update('none');
+        }
+      }
+
+      window.addEventListener('resize', forceChartResize);
+      window.addEventListener('orientationchange', forceChartResize);
+
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', forceChartResize);
+      }
+
+      if (typeof ResizeObserver !== 'undefined') {
+        var chartWrap = canvas.closest('.chart-wrap');
+        if (chartWrap) {
+          var observer = new ResizeObserver(function () {
+            forceChartResize();
+          });
+          observer.observe(chartWrap);
+        }
+      }
+
+      setTimeout(forceChartResize, 80);
+    })();
+  </script>
+</body>
+</html>
