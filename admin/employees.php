@@ -15,6 +15,7 @@ $adminName = trim((string) $_SESSION['admin_name']);
 /* ================= DB CONNECTION ================= */
 require_once __DIR__ . '/../config/database.php';
 $pdo = get_pdo_connection();
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
 /* ================= FUNCTIONS ================= */
 function e(string $value): string
@@ -42,6 +43,12 @@ function formatTime(?string $time): string
   return date('h:i A', strtotime($time));
 }
 
+function displayOrDash(?string $value): string
+{
+  $text = trim((string) $value);
+  return $text !== '' ? $text : '-';
+}
+
 function getEmployeeTableColumns(PDO $pdo): array
 {
   $columns = [];
@@ -56,7 +63,51 @@ function getEmployeeTableColumns(PDO $pdo): array
   return $columns;
 }
 
-$employeeTableColumns = getEmployeeTableColumns($pdo);
+function tableExists(PDO $pdo, string $tableName): bool
+{
+  try {
+    $stmt = $pdo->prepare('SHOW TABLES LIKE ?');
+    $stmt->execute([$tableName]);
+    return (bool) $stmt->fetchColumn();
+  } catch (Throwable $e) {
+    return false;
+  }
+}
+
+function ensureEmployeeDetailColumns(PDO $pdo, array $currentColumns): array
+{
+  $requiredColumns = [
+    'department' => "ALTER TABLE employees ADD COLUMN department VARCHAR(100) NOT NULL DEFAULT ''",
+    'position' => "ALTER TABLE employees ADD COLUMN position VARCHAR(100) NOT NULL DEFAULT ''",
+    'email' => "ALTER TABLE employees ADD COLUMN email VARCHAR(150) NOT NULL DEFAULT ''",
+    'mobile' => "ALTER TABLE employees ADD COLUMN mobile VARCHAR(20) NOT NULL DEFAULT ''",
+    'shift_in' => 'ALTER TABLE employees ADD COLUMN shift_in TIME NULL',
+    'shift_out' => 'ALTER TABLE employees ADD COLUMN shift_out TIME NULL',
+    'status' => "ALTER TABLE employees ADD COLUMN status ENUM('Active','Inactive') NOT NULL DEFAULT 'Active'",
+  ];
+
+  $columnMap = [];
+  foreach ($currentColumns as $columnName) {
+    $columnMap[$columnName] = true;
+  }
+
+  foreach ($requiredColumns as $columnName => $sql) {
+    if (isset($columnMap[$columnName])) {
+      continue;
+    }
+
+    try {
+      $pdo->exec($sql);
+      $columnMap[$columnName] = true;
+    } catch (Throwable $e) {
+      // Keep running even when schema updates are not permitted.
+    }
+  }
+
+  return getEmployeeTableColumns($pdo);
+}
+
+$employeeTableColumns = ensureEmployeeDetailColumns($pdo, getEmployeeTableColumns($pdo));
 $supportsDepartment = in_array('department', $employeeTableColumns, true);
 $supportsPosition = in_array('position', $employeeTableColumns, true);
 $supportsEmail = in_array('email', $employeeTableColumns, true);
@@ -64,11 +115,82 @@ $supportsMobile = in_array('mobile', $employeeTableColumns, true);
 $supportsShiftIn = in_array('shift_in', $employeeTableColumns, true);
 $supportsShiftOut = in_array('shift_out', $employeeTableColumns, true);
 $supportsStatus = in_array('status', $employeeTableColumns, true);
+$hasDepartmentsTable = tableExists($pdo, 'departments');
+$hasPositionsTable = tableExists($pdo, 'positions');
 
 $missingEmployeeColumns = [];
 foreach (['department', 'position', 'email', 'mobile', 'shift_in', 'shift_out', 'status'] as $columnName) {
   if (!in_array($columnName, $employeeTableColumns, true)) {
     $missingEmployeeColumns[] = $columnName;
+  }
+}
+
+/* ================= AJAX: GET POSITIONS ================= */
+if (isset($_GET['ajax']) && $_GET['ajax'] === 'positions') {
+  header('Content-Type: application/json');
+
+  $departmentId = (int) ($_GET['department_id'] ?? 0);
+
+  if ($hasDepartmentsTable && $hasPositionsTable && $departmentId > 0) {
+    $stmt = $pdo->prepare('SELECT id, position_name FROM positions WHERE department_id = ? ORDER BY position_name ASC');
+    $stmt->execute([$departmentId]);
+    echo json_encode($stmt->fetchAll(PDO::FETCH_ASSOC));
+  } else {
+    echo json_encode([]);
+  }
+  exit;
+}
+
+/* ================= HANDLE ADD DEPARTMENT ================= */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_department'])) {
+  if (!$hasDepartmentsTable) {
+    header('Location: employees.php?error=departments_table_missing');
+    exit;
+  }
+
+  $departmentName = trim((string) ($_POST['department_name'] ?? ''));
+
+  if ($departmentName !== '') {
+    $checkDept = $pdo->prepare('SELECT COUNT(*) FROM departments WHERE department_name = ?');
+    $checkDept->execute([$departmentName]);
+
+    if ((int) $checkDept->fetchColumn() === 0) {
+      $stmt = $pdo->prepare('INSERT INTO departments (department_name) VALUES (?)');
+      $stmt->execute([$departmentName]);
+
+      header('Location: employees.php?success=department_added');
+      exit;
+    }
+
+    header('Location: employees.php?error=department_exists');
+    exit;
+  }
+}
+
+/* ================= HANDLE ADD POSITION ================= */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_position'])) {
+  if (!$hasDepartmentsTable || !$hasPositionsTable) {
+    header('Location: employees.php?error=positions_table_missing');
+    exit;
+  }
+
+  $departmentId = (int) ($_POST['department_id'] ?? 0);
+  $positionName = trim((string) ($_POST['position_name'] ?? ''));
+
+  if ($departmentId > 0 && $positionName !== '') {
+    $checkPos = $pdo->prepare('SELECT COUNT(*) FROM positions WHERE department_id = ? AND position_name = ?');
+    $checkPos->execute([$departmentId, $positionName]);
+
+    if ((int) $checkPos->fetchColumn() === 0) {
+      $stmt = $pdo->prepare('INSERT INTO positions (department_id, position_name) VALUES (?, ?)');
+      $stmt->execute([$departmentId, $positionName]);
+
+      header('Location: employees.php?success=position_added');
+      exit;
+    }
+
+    header('Location: employees.php?error=position_exists');
+    exit;
   }
 }
 
@@ -209,6 +331,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_employee'])) {
   }
 }
 
+/* ================= LOAD DEPARTMENTS ================= */
+$departments = [];
+if ($hasDepartmentsTable) {
+  $deptStmt = $pdo->query('SELECT id, department_name FROM departments ORDER BY department_name ASC');
+  $departments = $deptStmt->fetchAll(PDO::FETCH_ASSOC);
+} elseif ($supportsDepartment) {
+  $deptStmt = $pdo->query('SELECT DISTINCT department FROM employees WHERE department IS NOT NULL AND department != "" ORDER BY department ASC');
+  while ($row = $deptStmt->fetch(PDO::FETCH_ASSOC)) {
+    $departments[] = [
+      'id' => 0,
+      'department_name' => (string) ($row['department'] ?? ''),
+    ];
+  }
+}
+
 /* ================= SEARCH / FILTER ================= */
 $search = trim((string) ($_GET['search'] ?? ''));
 $statusFilter = trim((string) ($_GET['status'] ?? ''));
@@ -239,12 +376,18 @@ if ($search !== '') {
   if ($supportsDepartment) {
     $searchConditions[] = 'department LIKE ?';
   }
+  if ($supportsPosition) {
+    $searchConditions[] = 'position LIKE ?';
+  }
 
   $sql .= ' AND (' . implode(' OR ', $searchConditions) . ')';
   $params[] = '%' . $search . '%';
   $params[] = '%' . $search . '%';
 
   if ($supportsDepartment) {
+    $params[] = '%' . $search . '%';
+  }
+  if ($supportsPosition) {
     $params[] = '%' . $search . '%';
   }
 }
@@ -277,7 +420,7 @@ if ($supportsStatus) {
 
 /* ================= DIALOG ================= */
 $dialog = (string) ($_GET['dialog'] ?? '');
-if ($dialog !== 'add' && $dialog !== 'delete' && $dialog !== 'edit') {
+if (!in_array($dialog, ['add', 'delete', 'edit', 'department', 'position'], true)) {
   $dialog = '';
 }
 
@@ -313,6 +456,27 @@ if ($editEmpId === '') {
 if ($editStatus !== 'Active' && $editStatus !== 'Inactive') {
   $editStatus = 'Active';
 }
+
+$departmentNameToId = [];
+foreach ($departments as $dept) {
+  $deptId = (int) ($dept['id'] ?? 0);
+  $deptName = trim((string) ($dept['department_name'] ?? ''));
+  if ($deptId > 0 && $deptName !== '') {
+    $departmentNameToId[strtolower($deptName)] = $deptId;
+  }
+}
+
+$editDepartmentId = 0;
+if ($hasDepartmentsTable && $hasPositionsTable && $editDepartment !== '') {
+  $editDepartmentId = (int) ($departmentNameToId[strtolower($editDepartment)] ?? 0);
+}
+
+$editPositions = [];
+if ($hasDepartmentsTable && $hasPositionsTable && $editDepartmentId > 0) {
+  $posStmt = $pdo->prepare('SELECT id, position_name FROM positions WHERE department_id = ? ORDER BY position_name ASC');
+  $posStmt->execute([$editDepartmentId]);
+  $editPositions = $posStmt->fetchAll(PDO::FETCH_ASSOC);
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -345,6 +509,10 @@ if ($editStatus !== 'Active' && $editStatus !== 'Inactive') {
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><path d="M20 8v6"></path><path d="M23 11h-6"></path></svg>
             Employees
           </a>
+          <a href="departments.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h5l2 3h11v10a2 2 0 0 1-2 2H3z"></path><path d="M3 7V5a2 2 0 0 1 2-2h4l2 3"></path></svg>
+            Departments
+          </a>
           <a href="attendance.php" class="dashboard-nav-link">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><path d="M16 2v4"></path><path d="M8 2v4"></path><path d="M3 10h18"></path><path d="M8 14h3"></path></svg>
             Attendance
@@ -352,6 +520,10 @@ if ($editStatus !== 'Active' && $editStatus !== 'Inactive') {
           <a href="dtr.php" class="dashboard-nav-link">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><path d="M8 13h8"></path><path d="M8 17h8"></path></svg>
             DTR
+          </a>
+          <a href="scanner/bio_connect.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l2.12-2.12a5 5 0 1 0-7.07-7.07L11.4 5.5"></path><path d="M14 11a5 5 0 0 0-7.54-.54L4.34 12.6a5 5 0 1 0 7.07 7.07l1.13-1.13"></path></svg>
+            Bio Connect
           </a>
         </div>
 
@@ -391,6 +563,30 @@ if ($editStatus !== 'Active' && $editStatus !== 'Inactive') {
           <div style="background:#dbeafe;padding:12px;border-radius:10px;margin-bottom:15px;">Employee updated successfully.</div>
         <?php endif; ?>
 
+        <?php if (isset($_GET['success']) && $_GET['success'] === 'department_added'): ?>
+          <div style="background:#ede9fe;padding:12px;border-radius:10px;margin-bottom:15px;">Department added successfully.</div>
+        <?php endif; ?>
+
+        <?php if (isset($_GET['success']) && $_GET['success'] === 'position_added'): ?>
+          <div style="background:#dcfce7;padding:12px;border-radius:10px;margin-bottom:15px;">Position added successfully.</div>
+        <?php endif; ?>
+
+        <?php if (isset($_GET['error']) && $_GET['error'] === 'department_exists'): ?>
+          <div style="background:#fef3c7;padding:12px;border-radius:10px;margin-bottom:15px;">Department already exists.</div>
+        <?php endif; ?>
+
+        <?php if (isset($_GET['error']) && $_GET['error'] === 'position_exists'): ?>
+          <div style="background:#fef3c7;padding:12px;border-radius:10px;margin-bottom:15px;">Position already exists in this department.</div>
+        <?php endif; ?>
+
+        <?php if (isset($_GET['error']) && $_GET['error'] === 'departments_table_missing'): ?>
+          <div style="background:#fee2e2;padding:12px;border-radius:10px;margin-bottom:15px;">Departments table is missing. Run setup for department management.</div>
+        <?php endif; ?>
+
+        <?php if (isset($_GET['error']) && $_GET['error'] === 'positions_table_missing'): ?>
+          <div style="background:#fee2e2;padding:12px;border-radius:10px;margin-bottom:15px;">Positions table is missing. Run setup for position management.</div>
+        <?php endif; ?>
+
         <div class="dashboard-stats stats-3">
           <article class="dashboard-stat-card accent-teal">
             <div class="stat-icon-wrap teal">
@@ -426,7 +622,15 @@ if ($editStatus !== 'Active' && $editStatus !== 'Inactive') {
         <article class="dashboard-panel employee-panel">
           <div class="employee-panel-head">
             <h2 class="panel-title">Manage Employees</h2>
-            <a class="qa-btn qa-primary employee-add-btn" href="employees.php?dialog=add">+ Add New Employee</a>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <a class="qa-btn qa-primary employee-add-btn" href="employees.php?dialog=add">+ Add New Employee</a>
+              <?php if ($hasDepartmentsTable): ?>
+                <a class="qa-btn qa-secondary" href="employees.php?dialog=department">+ Add Department</a>
+              <?php endif; ?>
+              <?php if ($hasDepartmentsTable && $hasPositionsTable): ?>
+                <a class="qa-btn qa-secondary" href="employees.php?dialog=position">+ Add Position</a>
+              <?php endif; ?>
+            </div>
           </div>
 
           <form class="employee-toolbar" method="GET" action="employees.php" role="group" aria-label="Employee toolbar">
@@ -471,10 +675,10 @@ if ($editStatus !== 'Active' && $editStatus !== 'Inactive') {
                       <td><?= $index + 1 ?></td>
                       <td><?= e($emp['name']) ?></td>
                       <td><?= e($emp['employee_key']) ?></td>
-                      <td><?= e($emp['department']) ?></td>
-                      <td><?= e($emp['position']) ?></td>
-                      <td><?= e($emp['email']) ?></td>
-                      <td><?= e($emp['mobile']) ?></td>
+                      <td><?= e(displayOrDash((string) ($emp['department'] ?? ''))) ?></td>
+                      <td><?= e(displayOrDash((string) ($emp['position'] ?? ''))) ?></td>
+                      <td><?= e(displayOrDash((string) ($emp['email'] ?? ''))) ?></td>
+                      <td><?= e(displayOrDash((string) ($emp['mobile'] ?? ''))) ?></td>
                       <td><?= e(formatTime($emp['shift_in'])) ?></td>
                       <td><?= e(formatTime($emp['shift_out'])) ?></td>
                       <td>
@@ -524,10 +728,27 @@ if ($editStatus !== 'Active' && $editStatus !== 'Inactive') {
           <input class="input" id="dialog_name" name="name" type="text" required>
 
           <label for="dialog_department">Department</label>
-          <input class="input" id="dialog_department" name="department" type="text" required>
+          <?php if ($hasDepartmentsTable && count($departments) > 0): ?>
+            <select id="dialog_department" name="department" required>
+              <option value="">Select Department</option>
+              <?php foreach ($departments as $dept): ?>
+                <option value="<?= e((string) ($dept['department_name'] ?? '')) ?>" data-id="<?= e((string) ($dept['id'] ?? '0')) ?>">
+                  <?= e((string) ($dept['department_name'] ?? '')) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          <?php else: ?>
+            <input class="input" id="dialog_department" name="department" type="text" required>
+          <?php endif; ?>
 
           <label for="dialog_position">Position</label>
-          <input class="input" id="dialog_position" name="position" type="text" required>
+          <?php if ($hasDepartmentsTable && $hasPositionsTable): ?>
+            <select id="dialog_position" name="position" required disabled>
+              <option value="">Select Department First</option>
+            </select>
+          <?php else: ?>
+            <input class="input" id="dialog_position" name="position" type="text" required>
+          <?php endif; ?>
 
           <label for="dialog_email">Email Address</label>
           <input class="input" id="dialog_email" name="email" type="email" required>
@@ -574,10 +795,37 @@ if ($editStatus !== 'Active' && $editStatus !== 'Inactive') {
           <input class="input" id="edit_emp_id" type="text" value="<?= e($editEmpId) ?>" readonly>
 
           <label for="edit_department">Department</label>
-          <input class="input" id="edit_department" name="department" type="text" value="<?= e($editDepartment) ?>" required>
+          <?php if ($hasDepartmentsTable && count($departments) > 0): ?>
+            <select id="edit_department" name="department" required>
+              <option value="">Select Department</option>
+              <?php foreach ($departments as $dept): ?>
+                <?php
+                  $deptName = (string) ($dept['department_name'] ?? '');
+                  $deptId = (string) ($dept['id'] ?? '0');
+                ?>
+                <option value="<?= e($deptName) ?>" data-id="<?= e($deptId) ?>" <?= $editDepartment === $deptName ? 'selected' : '' ?>>
+                  <?= e($deptName) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          <?php else: ?>
+            <input class="input" id="edit_department" name="department" type="text" value="<?= e($editDepartment) ?>" required>
+          <?php endif; ?>
 
           <label for="edit_position">Position</label>
-          <input class="input" id="edit_position" name="position" type="text" value="<?= e($editPosition) ?>" required>
+          <?php if ($hasDepartmentsTable && $hasPositionsTable): ?>
+            <select id="edit_position" name="position" required <?= $editDepartmentId > 0 ? '' : 'disabled' ?>>
+              <option value=""><?= $editDepartmentId > 0 ? 'Select Position' : 'Select Department First' ?></option>
+              <?php foreach ($editPositions as $position): ?>
+                <?php $positionName = (string) ($position['position_name'] ?? ''); ?>
+                <option value="<?= e($positionName) ?>" <?= $editPosition === $positionName ? 'selected' : '' ?>>
+                  <?= e($positionName) ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          <?php else: ?>
+            <input class="input" id="edit_position" name="position" type="text" value="<?= e($editPosition) ?>" required>
+          <?php endif; ?>
 
           <label for="edit_email">Email Address</label>
           <input class="input" id="edit_email" name="email" type="email" value="<?= e($editEmail) ?>" required>
@@ -601,6 +849,56 @@ if ($editStatus !== 'Active' && $editStatus !== 'Inactive') {
         <div class="dialog-footer">
           <a class="btn-secondary" href="employees.php">Cancel</a>
           <button class="btn-primary" type="submit" form="dialogEditForm" name="update_employee">Update Employee</button>
+        </div>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($dialog === 'department'): ?>
+    <div class="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="departmentDialogTitle">
+      <div class="dialog-card dialog-card-sm">
+        <div class="dialog-head">
+          <h2 id="departmentDialogTitle" class="dialog-title">Add Department</h2>
+          <a class="dialog-close" href="employees.php" aria-label="Close dialog">x</a>
+        </div>
+
+        <form id="dialogDepartmentForm" class="dialog-form-grid" method="POST" action="employees.php">
+          <label for="department_name">Department Name</label>
+          <input class="input" id="department_name" name="department_name" type="text" placeholder="e.g. Kitchen" required>
+        </form>
+
+        <div class="dialog-footer">
+          <a class="btn-secondary" href="employees.php">Cancel</a>
+          <button class="btn-primary" type="submit" form="dialogDepartmentForm" name="add_department">Save Department</button>
+        </div>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($dialog === 'position'): ?>
+    <div class="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="positionDialogTitle">
+      <div class="dialog-card dialog-card-sm">
+        <div class="dialog-head">
+          <h2 id="positionDialogTitle" class="dialog-title">Add Position</h2>
+          <a class="dialog-close" href="employees.php" aria-label="Close dialog">x</a>
+        </div>
+
+        <form id="dialogPositionForm" class="dialog-form-grid" method="POST" action="employees.php">
+          <label for="position_department_id">Department</label>
+          <select id="position_department_id" name="department_id" required>
+            <option value="">Select Department</option>
+            <?php foreach ($departments as $dept): ?>
+              <option value="<?= e((string) ($dept['id'] ?? '0')) ?>"><?= e((string) ($dept['department_name'] ?? '')) ?></option>
+            <?php endforeach; ?>
+          </select>
+
+          <label for="position_name">Position Name</label>
+          <input class="input" id="position_name" name="position_name" type="text" placeholder="e.g. Chef" required>
+        </form>
+
+        <div class="dialog-footer">
+          <a class="btn-secondary" href="employees.php">Cancel</a>
+          <button class="btn-primary" type="submit" form="dialogPositionForm" name="add_position">Save Position</button>
         </div>
       </div>
     </div>
@@ -637,6 +935,70 @@ if ($editStatus !== 'Active' && $editStatus !== 'Inactive') {
       </div>
     </div>
   <?php endif; ?>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      function bindDepartmentPositionSelect(departmentId, positionId, selectedPosition) {
+        const departmentSelect = document.getElementById(departmentId);
+        const positionSelect = document.getElementById(positionId);
+
+        if (!departmentSelect || !positionSelect || departmentSelect.tagName !== 'SELECT' || positionSelect.tagName !== 'SELECT') {
+          return;
+        }
+
+        function loadPositions() {
+          const selectedOption = departmentSelect.options[departmentSelect.selectedIndex];
+          const departmentKey = selectedOption ? selectedOption.getAttribute('data-id') : '';
+
+          positionSelect.disabled = true;
+          positionSelect.innerHTML = '<option value="">Loading...</option>';
+
+          if (!departmentKey || departmentKey === '0') {
+            positionSelect.innerHTML = '<option value="">Select Department First</option>';
+            return;
+          }
+
+          fetch('employees.php?ajax=positions&department_id=' + encodeURIComponent(departmentKey))
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+              positionSelect.innerHTML = '<option value="">Select Position</option>';
+
+              if (!Array.isArray(data) || data.length === 0) {
+                positionSelect.innerHTML = '<option value="">No positions found</option>';
+                positionSelect.disabled = true;
+                return;
+              }
+
+              data.forEach(function (position) {
+                const option = document.createElement('option');
+                option.value = position.position_name;
+                option.textContent = position.position_name;
+                if (selectedPosition && selectedPosition === position.position_name) {
+                  option.selected = true;
+                }
+                positionSelect.appendChild(option);
+              });
+
+              positionSelect.disabled = false;
+            })
+            .catch(function () {
+              positionSelect.innerHTML = '<option value="">Error loading positions</option>';
+              positionSelect.disabled = true;
+            });
+        }
+
+        departmentSelect.addEventListener('change', function () {
+          selectedPosition = '';
+          loadPositions();
+        });
+
+        loadPositions();
+      }
+
+      bindDepartmentPositionSelect('dialog_department', 'dialog_position', '');
+      bindDepartmentPositionSelect('edit_department', 'edit_position', <?= json_encode($editPosition) ?>);
+    });
+  </script>
 
 </body>
 </html>
