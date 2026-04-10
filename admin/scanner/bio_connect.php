@@ -22,7 +22,7 @@ $deviceNameValue = trim((string) ($_POST['device_name'] ?? ''));
 $ipAddressValue = trim((string) ($_POST['ip_address'] ?? ''));
 $portValue = trim((string) ($_POST['port'] ?? '4370'));
 
-if (!in_array($dialog, ['add', 'connect'], true)) {
+if (!in_array($dialog, ['add', 'connect', 'edit', 'delete', 'disconnect'], true)) {
   $dialog = '';
 }
 
@@ -164,14 +164,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: bio_connect.php?notice=' . ($isConnected ? 'device-connected' : 'device-disconnected'));
     exit;
   }
+
+  if ($schemaError === '' && $action === 'edit_device') {
+    $deviceId = (int) ($_POST['device_id'] ?? 0);
+    $name = trim((string) ($_POST['device_name'] ?? ''));
+    $ip = trim((string) ($_POST['ip_address'] ?? ''));
+    $port = (int) ($_POST['port'] ?? 0);
+
+    if ($deviceId <= 0 || $name === '' || $ip === '' || $port <= 0) {
+      $feedbackMessage = 'Please complete all required fields with valid values.';
+      $feedbackColor = '#b91c1c';
+      $dialog = 'edit';
+    } else {
+      try {
+        $stmt = $pdo->prepare('UPDATE biometric_devices SET device_name = ?, ip_address = ?, port = ? WHERE id = ?');
+        $stmt->execute([$name, $ip, $port, $deviceId]);
+
+        if ($stmt->rowCount() < 1) {
+          $existsStmt = $pdo->prepare('SELECT id FROM biometric_devices WHERE id = ? LIMIT 1');
+          $existsStmt->execute([$deviceId]);
+          if (!$existsStmt->fetch()) {
+            header('Location: bio_connect.php?notice=device-not-found');
+            exit;
+          }
+        }
+
+        header('Location: bio_connect.php?notice=device-updated');
+        exit;
+      } catch (Throwable $e) {
+        $feedbackMessage = 'Unable to update the biometric device right now.';
+        $feedbackColor = '#b91c1c';
+        $dialog = 'edit';
+      }
+    }
+  }
+
+  if ($schemaError === '' && $action === 'delete_device') {
+    $deviceId = (int) ($_POST['device_id'] ?? 0);
+
+    if ($deviceId <= 0) {
+      header('Location: bio_connect.php?notice=device-invalid');
+      exit;
+    }
+
+    $deleteStmt = $pdo->prepare('DELETE FROM biometric_devices WHERE id = ?');
+    $deleteStmt->execute([$deviceId]);
+
+    if ($deleteStmt->rowCount() > 0) {
+      header('Location: bio_connect.php?notice=device-deleted');
+      exit;
+    }
+
+    header('Location: bio_connect.php?notice=device-not-found');
+    exit;
+  }
+
+  if ($schemaError === '' && $action === 'disconnect_device') {
+    $deviceId = (int) ($_POST['device_id'] ?? 0);
+
+    if ($deviceId <= 0) {
+      header('Location: bio_connect.php?notice=device-invalid');
+      exit;
+    }
+
+    $updateStmt = $pdo->prepare("UPDATE biometric_devices SET status = 'disconnected' WHERE id = ?");
+    $updateStmt->execute([$deviceId]);
+
+    if ($updateStmt->rowCount() > 0) {
+      header('Location: bio_connect.php?notice=device-manually-disconnected');
+      exit;
+    }
+
+    $existsStmt = $pdo->prepare('SELECT id FROM biometric_devices WHERE id = ? LIMIT 1');
+    $existsStmt->execute([$deviceId]);
+    if ($existsStmt->fetch()) {
+      header('Location: bio_connect.php?notice=device-manually-disconnected');
+      exit;
+    }
+
+    header('Location: bio_connect.php?notice=device-not-found');
+    exit;
+  }
 }
 
 $selectedDeviceId = (int) ($_GET['id'] ?? 0);
 $selectedDevice = null;
 
-if ($schemaError === '' && $dialog === 'connect') {
+if ($schemaError === '' && in_array($dialog, ['connect', 'edit', 'delete', 'disconnect'], true)) {
   if ($selectedDeviceId <= 0) {
-    $feedbackMessage = 'Invalid device selected for connection.';
+    $feedbackMessage = 'Invalid device selected.';
     $feedbackColor = '#b91c1c';
     $dialog = '';
   } else {
@@ -186,6 +267,10 @@ if ($schemaError === '' && $dialog === 'connect') {
     }
   }
 }
+
+$editDeviceNameValue = trim((string) ($_POST['device_name'] ?? ($selectedDevice['device_name'] ?? '')));
+$editIpAddressValue = trim((string) ($_POST['ip_address'] ?? ($selectedDevice['ip_address'] ?? '')));
+$editPortValue = trim((string) ($_POST['port'] ?? (($selectedDevice['port'] ?? '4370'))));
 
 if ($schemaError === '') {
   try {
@@ -224,6 +309,15 @@ foreach ($devices as $device) {
   } elseif ($notice === 'device-not-found') {
     $feedbackMessage = 'Selected device was not found.';
     $feedbackColor = '#b91c1c';
+  } elseif ($notice === 'device-updated') {
+    $feedbackMessage = 'Biometric device updated successfully.';
+    $feedbackColor = '#0f766e';
+  } elseif ($notice === 'device-deleted') {
+    $feedbackMessage = 'Biometric device deleted successfully.';
+    $feedbackColor = '#166534';
+  } elseif ($notice === 'device-manually-disconnected') {
+    $feedbackMessage = 'Device disconnected successfully.';
+    $feedbackColor = '#166534';
   }
 ?>
 <!DOCTYPE html>
@@ -353,7 +447,7 @@ foreach ($devices as $device) {
                   <th>IP Address</th>
                   <th>Port</th>
                   <th>Status</th>
-                  <th>Action</th>
+                  <th style="text-align:center;">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -383,10 +477,24 @@ foreach ($devices as $device) {
                           <?= e($rawStatus !== '' ? ucfirst($rawStatus) : 'Unknown') ?>
                         </span>
                       </td>
-                      <td>
-                        <a class="btn-mini edit" href="connect_device.php?id=<?= urlencode((string) ($row['id'] ?? '')) ?>">
-                          Connect
-                        </a>
+                      <td style="text-align:center;">
+                        <div class="tool-actions" style="justify-content:center;">
+                          <?php if (strtolower(trim((string) ($row['status'] ?? ''))) === 'connected'): ?>
+                            <a class="btn-mini delete" href="bio_connect.php?dialog=disconnect&id=<?= urlencode((string) ($row['id'] ?? '')) ?>">
+                              Disconnect
+                            </a>
+                          <?php else: ?>
+                            <a class="btn-mini edit" href="connect_device.php?id=<?= urlencode((string) ($row['id'] ?? '')) ?>">
+                              Connect
+                            </a>
+                          <?php endif; ?>
+                          <a class="btn-mini edit" href="bio_connect.php?dialog=edit&id=<?= urlencode((string) ($row['id'] ?? '')) ?>">
+                            Edit
+                          </a>
+                          <a class="btn-mini delete" href="bio_connect.php?dialog=delete&id=<?= urlencode((string) ($row['id'] ?? '')) ?>">
+                            Delete
+                          </a>
+                        </div>
                       </td>
                     </tr>
                   <?php endforeach; ?>
@@ -477,6 +585,122 @@ foreach ($devices as $device) {
           <div class="dialog-footer">
             <a class="btn-secondary" href="bio_connect.php">Cancel</a>
             <button class="btn-primary" type="submit">Connect Device</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($dialog === 'edit' && $selectedDevice): ?>
+    <div class="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="editDeviceDialogTitle">
+      <div class="dialog-card">
+        <div class="dialog-head">
+          <h2 id="editDeviceDialogTitle" class="dialog-title">Edit Device</h2>
+          <a class="dialog-close" href="bio_connect.php" aria-label="Close dialog">x</a>
+        </div>
+
+        <form id="dialogEditDeviceForm" class="dialog-form-grid" method="POST" action="bio_connect.php">
+          <input type="hidden" name="action" value="edit_device">
+          <input type="hidden" name="device_id" value="<?= e((string) ($selectedDevice['id'] ?? '0')) ?>">
+
+          <label for="edit_device_name">Device Name</label>
+          <input class="input" id="edit_device_name" name="device_name" type="text" value="<?= e($editDeviceNameValue) ?>" required>
+
+          <label for="edit_ip_address">IP Address</label>
+          <input class="input" id="edit_ip_address" name="ip_address" type="text" value="<?= e($editIpAddressValue) ?>" required>
+
+          <label for="edit_port">Port</label>
+          <input class="input" id="edit_port" name="port" type="number" min="1" value="<?= e($editPortValue !== '' ? $editPortValue : '4370') ?>" required>
+        </form>
+
+        <div class="dialog-footer">
+          <a class="btn-secondary" href="bio_connect.php">Cancel</a>
+          <button class="btn-primary" type="submit" form="dialogEditDeviceForm">Update Device</button>
+        </div>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($dialog === 'delete' && $selectedDevice): ?>
+    <div class="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="deleteDeviceDialogTitle">
+      <div class="dialog-card dialog-card-sm">
+        <div class="dialog-head">
+          <h2 id="deleteDeviceDialogTitle" class="dialog-title">Delete Device</h2>
+          <a class="dialog-close" href="bio_connect.php" aria-label="Close dialog">x</a>
+        </div>
+
+        <p class="helper-text">Are you sure you want to delete this biometric device?</p>
+
+        <div class="summary-box" style="margin: 14px 16px 0;">
+          <h3 class="summary-title">Device Information</h3>
+          <table class="summary-table">
+            <tbody>
+              <tr>
+                <th scope="row">Name</th>
+                <td><?= e((string) ($selectedDevice['device_name'] ?? '')) ?></td>
+              </tr>
+              <tr>
+                <th scope="row">IP Address</th>
+                <td><?= e((string) ($selectedDevice['ip_address'] ?? '')) ?></td>
+              </tr>
+              <tr>
+                <th scope="row">Port</th>
+                <td><?= e((string) ($selectedDevice['port'] ?? '')) ?></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <form method="POST" action="bio_connect.php">
+          <input type="hidden" name="action" value="delete_device">
+          <input type="hidden" name="device_id" value="<?= e((string) ($selectedDevice['id'] ?? '0')) ?>">
+
+          <div class="dialog-footer">
+            <a class="btn-secondary" href="bio_connect.php">Cancel</a>
+            <button class="btn-danger" type="submit">Delete Device</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  <?php endif; ?>
+
+  <?php if ($dialog === 'disconnect' && $selectedDevice): ?>
+    <div class="dialog-overlay" role="dialog" aria-modal="true" aria-labelledby="disconnectDeviceDialogTitle">
+      <div class="dialog-card dialog-card-sm">
+        <div class="dialog-head">
+          <h2 id="disconnectDeviceDialogTitle" class="dialog-title">Disconnect Device</h2>
+          <a class="dialog-close" href="bio_connect.php" aria-label="Close dialog">x</a>
+        </div>
+
+        <p class="helper-text">Disconnect this device from the system?</p>
+
+        <div class="summary-box" style="margin: 14px 16px 0;">
+          <h3 class="summary-title">Device Information</h3>
+          <table class="summary-table">
+            <tbody>
+              <tr>
+                <th scope="row">Name</th>
+                <td><?= e((string) ($selectedDevice['device_name'] ?? '')) ?></td>
+              </tr>
+              <tr>
+                <th scope="row">IP Address</th>
+                <td><?= e((string) ($selectedDevice['ip_address'] ?? '')) ?></td>
+              </tr>
+              <tr>
+                <th scope="row">Port</th>
+                <td><?= e((string) ($selectedDevice['port'] ?? '')) ?></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <form method="POST" action="bio_connect.php">
+          <input type="hidden" name="action" value="disconnect_device">
+          <input type="hidden" name="device_id" value="<?= e((string) ($selectedDevice['id'] ?? '0')) ?>">
+
+          <div class="dialog-footer">
+            <a class="btn-secondary" href="bio_connect.php">Cancel</a>
+            <button class="btn-danger" type="submit">Disconnect Device</button>
           </div>
         </form>
       </div>
