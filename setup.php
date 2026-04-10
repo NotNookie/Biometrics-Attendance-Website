@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+session_start();
+
 require_once __DIR__ . '/config/database.php';
 
 function e(string $value): string
@@ -11,6 +13,26 @@ function e(string $value): string
 $current = load_database_settings();
 $error = '';
 $success = '';
+$next = trim((string) ($_GET['next'] ?? $_POST['next'] ?? ''));
+
+function resolve_post_setup_redirect(string $next): string
+{
+    if ($next !== '') {
+        $decodedNext = rawurldecode($next);
+
+        if (strpos($decodedNext, '://') === false && str_starts_with($decodedNext, '/')) {
+            if (!str_contains(strtolower($decodedNext), '/setup.php')) {
+                return $decodedNext;
+            }
+        }
+    }
+
+    if (isset($_SESSION['admin_name']) && trim((string) $_SESSION['admin_name']) !== '') {
+        return 'admin/dashboard.php';
+    }
+
+    return 'admin/login.php';
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $host = trim((string) ($_POST['host'] ?? DEFAULT_DB_HOST));
@@ -70,6 +92,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     } else {
                         $success = 'Setup complete. Database settings saved for this machine.';
                         $current = $localConfig;
+
+                        $redirectTarget = resolve_post_setup_redirect($next);
+                        header('Location: ' . $redirectTarget);
+                        exit;
                     }
                 }
             }
@@ -116,6 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="post">
+            <input type="hidden" name="next" value="<?= e($next) ?>">
             <div class="row">
                 <div class="field">
                     <label for="host">Host</label>

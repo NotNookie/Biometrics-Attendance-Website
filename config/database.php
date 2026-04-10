@@ -8,6 +8,32 @@ define('DEFAULT_DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');
 define('LOCAL_DB_CONFIG_FILE', __DIR__ . '/local.database.php');
 
+function build_setup_redirect_path(): string
+{
+    $appRoot = realpath(dirname(__DIR__));
+    $scriptFile = isset($_SERVER['SCRIPT_FILENAME']) ? realpath((string) $_SERVER['SCRIPT_FILENAME']) : false;
+
+    if ($appRoot === false || $scriptFile === false) {
+        return 'setup.php';
+    }
+
+    $scriptDir = dirname($scriptFile);
+    $normalizedRoot = str_replace('\\', '/', $appRoot);
+    $normalizedScriptDir = str_replace('\\', '/', $scriptDir);
+
+    if (strpos($normalizedScriptDir, $normalizedRoot) !== 0) {
+        return 'setup.php';
+    }
+
+    $relativeDir = trim(substr($normalizedScriptDir, strlen($normalizedRoot)), '/');
+    if ($relativeDir === '') {
+        return 'setup.php';
+    }
+
+    $depth = substr_count($relativeDir, '/') + 1;
+    return str_repeat('../', $depth) . 'setup.php';
+}
+
 function read_db_env(string $key): ?string
 {
     $value = getenv($key);
@@ -67,6 +93,22 @@ function fail_database_connection(string $message): never
     $setupHint = 'Run setup.php once to save DB credentials for this machine.';
     if (PHP_SAPI === 'cli') {
         die("Database Connection Failed. {$message} {$setupHint}");
+    }
+
+    $scriptName = strtolower((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
+    if (str_ends_with($scriptName, '/setup.php') || $scriptName === 'setup.php') {
+        die("Database Connection Failed. {$message} {$setupHint}");
+    }
+
+    if (!headers_sent()) {
+        $location = build_setup_redirect_path() . '?db_error=1';
+        $requestUri = (string) ($_SERVER['REQUEST_URI'] ?? '');
+        if ($requestUri !== '') {
+            $location .= '&next=' . rawurlencode($requestUri);
+        }
+
+        header('Location: ' . $location);
+        exit;
     }
 
     die("Database Connection Failed. {$message} {$setupHint}");
