@@ -31,6 +31,49 @@ function e(string $value): string
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
 
+function ensureBiometricDevicesSchema(PDO $pdo): string
+{
+  try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS biometric_devices (
+      id INT NOT NULL AUTO_INCREMENT,
+      device_name VARCHAR(100) DEFAULT NULL,
+      ip_address VARCHAR(50) DEFAULT NULL,
+      port INT DEFAULT 4370,
+      status ENUM('connected','disconnected') DEFAULT 'disconnected',
+      created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+
+    $columns = [];
+    $columnStmt = $pdo->query('SHOW COLUMNS FROM biometric_devices');
+    while ($row = $columnStmt->fetch(PDO::FETCH_ASSOC)) {
+      if (isset($row['Field'])) {
+        $columns[] = (string) $row['Field'];
+      }
+    }
+
+    $requiredColumns = [
+      'device_name' => 'ALTER TABLE biometric_devices ADD COLUMN device_name VARCHAR(100) DEFAULT NULL',
+      'ip_address' => 'ALTER TABLE biometric_devices ADD COLUMN ip_address VARCHAR(50) DEFAULT NULL',
+      'port' => 'ALTER TABLE biometric_devices ADD COLUMN port INT DEFAULT 4370',
+      "status" => "ALTER TABLE biometric_devices ADD COLUMN status ENUM('connected','disconnected') DEFAULT 'disconnected'",
+      'created_at' => 'ALTER TABLE biometric_devices ADD COLUMN created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP',
+    ];
+
+    foreach ($requiredColumns as $columnName => $sql) {
+      if (in_array($columnName, $columns, true)) {
+        continue;
+      }
+
+      $pdo->exec($sql);
+    }
+
+    return '';
+  } catch (Throwable $e) {
+    return 'Biometric device table is not ready. Open setup.php and verify DB permissions/config.';
+  }
+}
+
 function connectBiometric(string $ip, int $port): bool
 {
   $zkLibraryPath = __DIR__ . '/../../zk/ZKLibrary.php';
@@ -59,10 +102,20 @@ function connectBiometric(string $ip, int $port): bool
   return false;
 }
 
+$schemaError = ensureBiometricDevicesSchema($pdo);
+if ($schemaError !== '') {
+  $loadError = $schemaError;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  if ($schemaError !== '') {
+    $feedbackMessage = 'Unable to process device actions until the database setup is fixed.';
+    $feedbackColor = '#b91c1c';
+  }
+
   $action = (string) ($_POST['action'] ?? '');
 
-  if ($action === 'add_device') {
+  if ($schemaError === '' && $action === 'add_device') {
     $name = trim((string) ($_POST['device_name'] ?? ''));
     $ip = trim((string) ($_POST['ip_address'] ?? ''));
     $port = (int) ($_POST['port'] ?? 0);
@@ -85,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
   }
 
-  if ($action === 'connect_device') {
+  if ($schemaError === '' && $action === 'connect_device') {
     $deviceId = (int) ($_POST['device_id'] ?? 0);
 
     if ($deviceId <= 0) {
@@ -116,7 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $selectedDeviceId = (int) ($_GET['id'] ?? 0);
 $selectedDevice = null;
 
-if ($dialog === 'connect') {
+if ($schemaError === '' && $dialog === 'connect') {
   if ($selectedDeviceId <= 0) {
     $feedbackMessage = 'Invalid device selected for connection.';
     $feedbackColor = '#b91c1c';
@@ -134,11 +187,13 @@ if ($dialog === 'connect') {
   }
 }
 
-try {
+if ($schemaError === '') {
+  try {
     $stmt = $pdo->query('SELECT id, device_name, ip_address, port, status FROM biometric_devices ORDER BY id DESC');
     $devices = $stmt->fetchAll();
-} catch (Throwable $e) {
-    $loadError = 'Unable to load biometric devices right now.';
+  } catch (Throwable $e) {
+    $loadError = 'Unable to load biometric devices right now. Check setup.php database settings.';
+  }
 }
 
 $totalDevices = count($devices);
