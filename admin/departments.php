@@ -56,31 +56,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 /* ================= LOAD DATA ================= */
-$stmt = $pdo->query("
-    SELECT d.id AS dept_id, d.department_name,
-           p.id AS pos_id, p.position_name
-    FROM departments d
-    LEFT JOIN positions p ON d.id = p.department_id
-    ORDER BY d.department_name ASC
+$deptStmt = $pdo->query('SELECT id, department_name FROM departments ORDER BY department_name ASC');
+$departments = $deptStmt->fetchAll(PDO::FETCH_ASSOC);
+
+$posStmt = $pdo->query("
+  SELECT p.id, p.position_name, p.department_id, d.department_name
+  FROM positions p
+  LEFT JOIN departments d ON d.id = p.department_id
+  ORDER BY d.department_name ASC, p.position_name ASC
 ");
-
-$rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-$departments = [];
-foreach ($rows as $r) {
-    if (!isset($departments[$r['dept_id']])) {
-        $departments[$r['dept_id']] = [
-            'name' => $r['department_name'],
-            'positions' => []
-        ];
-    }
-    if ($r['pos_id']) {
-        $departments[$r['dept_id']]['positions'][] = [
-            'id' => $r['pos_id'],
-            'name' => $r['position_name']
-        ];
-    }
-}
+$positions = $posStmt->fetchAll(PDO::FETCH_ASSOC);
 
 /* ================= DIALOG ================= */
 $dialog = (string) ($_GET['dialog'] ?? '');
@@ -99,6 +84,24 @@ if (!in_array($dialog, ['add_department', 'add_position'], true)) {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    .departments-split-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .departments-split-grid .employee-table {
+      min-width: 560px;
+    }
+
+    @media (max-width: 1200px) {
+      .departments-split-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 
 <body class="<?= $dialog !== '' ? 'modal-open' : '' ?>">
@@ -146,6 +149,10 @@ if (!in_array($dialog, ['add_department', 'add_position'], true)) {
         </div>
 
         <div class="dashboard-nav-bottom">
+          <a href="settings.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            Settings
+          </a>
           <a href="logout.php" class="dashboard-nav-link js-logout-link">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
             Logout
@@ -171,12 +178,13 @@ if (!in_array($dialog, ['add_department', 'add_position'], true)) {
 
 <section class="dashboard-content">
 
+<div class="departments-split-grid">
+
 <article class="dashboard-panel employee-panel">
   <div class="employee-panel-head">
     <h2 class="panel-title">Department Directory</h2>
     <div style="display:flex; gap:10px; flex-wrap:wrap;">
       <a href="?dialog=add_department" class="qa-btn qa-primary">+ Add Department</a>
-      <a href="?dialog=add_position" class="qa-btn qa-secondary">+ Add Position</a>
     </div>
   </div>
 
@@ -185,65 +193,84 @@ if (!in_array($dialog, ['add_department', 'add_position'], true)) {
   <thead>
     <tr>
       <th>Department</th>
-      <th>Position</th>
-      <th>Position Actions</th>
       <th>Department Actions</th>
     </tr>
   </thead>
 
   <tbody>
-  <?php foreach ($departments as $deptId => $dept): ?>
-
-    <?php if (count($dept['positions']) > 0): ?>
-      <?php foreach ($dept['positions'] as $pos): ?>
+  <?php if (count($departments) > 0): ?>
+    <?php foreach ($departments as $dept): ?>
       <tr>
-        <td><?= e($dept['name']) ?></td>
-        <td><?= e($pos['name']) ?></td>
-
+        <td><?= e((string) ($dept['department_name'] ?? '')) ?></td>
         <td>
           <div class="tool-actions">
             <a class="btn-mini edit" href="#">Edit</a>
-
             <form method="POST">
-              <input type="hidden" name="id" value="<?= $pos['id'] ?>">
-              <button class="btn-mini delete" name="delete_position">Delete</button>
-            </form>
-     </div>
-        </td>
-
-        <td>
-          <div class="tool-actions">
-            <a class="btn-mini edit" href="#">Edit</a>
-
-            <form method="POST">
-              <input type="hidden" name="id" value="<?= $deptId ?>">
+              <input type="hidden" name="id" value="<?= e((string) ($dept['id'] ?? '0')) ?>">
               <button class="btn-mini delete" name="delete_department">Delete</button>
             </form>
           </div>
         </td>
       </tr>
-      <?php endforeach; ?>
-
-    <?php else: ?>
-      <tr>
-        <td><?= e($dept['name']) ?></td>
-        <td colspan="2">No positions</td>
-
-        <td>
-          <form method="POST">
-            <input type="hidden" name="id" value="<?= $deptId ?>">
-            <button class="btn-mini delete" name="delete_department">Delete</button>
-          </form>
-        </td>
-      </tr>
-    <?php endif; ?>
-
-  <?php endforeach; ?>
+    <?php endforeach; ?>
+  <?php else: ?>
+    <tr>
+      <td colspan="2">No departments found.</td>
+    </tr>
+  <?php endif; ?>
   </tbody>
 </table>
 </div>
 
 </article>
+
+<article class="dashboard-panel employee-panel">
+  <div class="employee-panel-head">
+    <h2 class="panel-title">Position Directory</h2>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a href="?dialog=add_position" class="qa-btn qa-secondary">+ Add Position</a>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+<table class="timecard employee-table">
+  <thead>
+    <tr>
+      <th>Position</th>
+      <th>Department</th>
+      <th>Position Actions</th>
+    </tr>
+  </thead>
+
+  <tbody>
+  <?php if (count($positions) > 0): ?>
+    <?php foreach ($positions as $pos): ?>
+      <tr>
+        <td><?= e((string) ($pos['position_name'] ?? '')) ?></td>
+        <td><?= e((string) (($pos['department_name'] ?? '') !== '' ? $pos['department_name'] : 'Unassigned')) ?></td>
+        <td>
+          <div class="tool-actions">
+            <a class="btn-mini edit" href="#">Edit</a>
+            <form method="POST">
+              <input type="hidden" name="id" value="<?= e((string) ($pos['id'] ?? '0')) ?>">
+              <button class="btn-mini delete" name="delete_position">Delete</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+    <?php endforeach; ?>
+  <?php else: ?>
+    <tr>
+      <td colspan="3">No positions found.</td>
+    </tr>
+  <?php endif; ?>
+  </tbody>
+</table>
+</div>
+
+</article>
+
+</div>
 
 </section>
 </main>
@@ -288,8 +315,8 @@ if (!in_array($dialog, ['add_department', 'add_position'], true)) {
       <label>Department</label>
       <select name="department_id" required>
         <option value="">Select Department</option>
-        <?php foreach ($departments as $id => $d): ?>
-          <option value="<?= $id ?>"><?= e($d['name']) ?></option>
+        <?php foreach ($departments as $dept): ?>
+          <option value="<?= e((string) ($dept['id'] ?? '0')) ?>"><?= e((string) ($dept['department_name'] ?? '')) ?></option>
         <?php endforeach; ?>
       </select>
 

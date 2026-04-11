@@ -229,6 +229,10 @@ $recentActivities = array_slice($recentActivities, 0, 8);
         </div>
 
         <div class="dashboard-nav-bottom">
+          <a href="settings.php" class="dashboard-nav-link">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 10 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            Settings
+          </a>
           <a href="logout.php" class="dashboard-nav-link js-logout-link">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><path d="M16 17l5-5-5-5"></path><path d="M21 12H9"></path></svg>
             Logout
@@ -331,6 +335,8 @@ $recentActivities = array_slice($recentActivities, 0, 8);
           <h2 class="panel-title">Quick Actions</h2>
           <div class="quick-actions">
             <a href="employees.php?dialog=add" class="qa-btn qa-primary">+ Add Employee</a>
+            <a href="departments.php?dialog=add_department" class="qa-btn qa-secondary">+ Add Department</a>
+            <a href="departments.php?dialog=add_position" class="qa-btn qa-secondary">+ Add Position</a>
             <a href="attendance.php" class="qa-btn qa-secondary">View Attendance</a>
             <a href="dtr.php" class="qa-btn qa-secondary">Generate Report</a>
           </div>
