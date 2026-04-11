@@ -1,29 +1,30 @@
 <?php
 
-declare(strict_types=1);
+  declare(strict_types=1);
 
-session_start();
+  session_start();
 
-if (isset($_SESSION['admin_name']) && $_SESSION['admin_name'] !== '') {
-  header('Location: dashboard.php');
-  exit;
-}
-
-$error = '';
-$loggedOut = ($_GET['logged_out'] ?? '') === '1';
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $username = trim((string) ($_POST['username'] ?? ''));
-  $password = trim((string) ($_POST['password'] ?? ''));
-
-  if ($username === '' || $password === '') {
-    $error = 'Please enter your username and password.';
-  } else {
-    $_SESSION['admin_name'] = $username;
+  if (isset($_SESSION['admin_name']) && $_SESSION['admin_name'] !== '') {
     header('Location: dashboard.php');
     exit;
   }
-}
+
+  $error = '';
+  $loggedOut = ($_GET['logged_out'] ?? '') === '1';
+
+  if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username = trim((string) ($_POST['username'] ?? ''));
+    $password = trim((string) ($_POST['password'] ?? ''));
+    
+
+    if ($username === '' || $password === '') {
+      $error = 'Please enter your username and password.';
+    } else {
+      $_SESSION['admin_name'] = $username;
+      header('Location: dashboard.php');
+      exit;
+    }
+  }
 ?>
 <!DOCTYPE html>
 <html lang="en">
