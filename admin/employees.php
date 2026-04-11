@@ -624,12 +624,7 @@ if ($hasDepartmentsTable && $hasPositionsTable && $editDepartmentId > 0) {
             <h2 class="panel-title">Manage Employees</h2>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
               <a class="qa-btn qa-primary employee-add-btn" href="employees.php?dialog=add">+ Add New Employee</a>
-              <?php if ($hasDepartmentsTable): ?>
-                <a class="qa-btn qa-secondary" href="employees.php?dialog=department">+ Add Department</a>
-              <?php endif; ?>
-              <?php if ($hasDepartmentsTable && $hasPositionsTable): ?>
-                <a class="qa-btn qa-secondary" href="employees.php?dialog=position">+ Add Position</a>
-              <?php endif; ?>
+              
             </div>
           </div>
 
